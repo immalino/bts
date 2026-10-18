@@ -29,14 +29,16 @@ def test_icon_properties():
 
 def test_pyinstaller_spec_configuration():
     """Memastikan file spec PyInstaller memuat konfigurasi noconsole, ikon, dan excludes."""
-    spec_path = BASE_DIR / "build_scripts" / "photo_rename_studio.spec"
-    assert spec_path.exists(), "File build_scripts/photo_rename_studio.spec harus ada."
+    spec_path = BASE_DIR / "build_scripts" / "bts_document_control.spec"
+    assert spec_path.exists(), "File build_scripts/bts_document_control.spec harus ada."
 
     content = spec_path.read_text(encoding="utf-8")
     assert "console=False" in content, "Target executable harus noconsole / windowed."
     assert "icon.ico" in content, "Spec harus menetapkan ikon aplikasi."
     assert "excludes=" in content, "Spec harus mengabaikan modul yang tidak digunakan."
     assert "PySide6.QtWebEngineCore" in content, "Spec harus mengabaikan modul berat seperti WebEngine."
+    assert 'name="BTSDocumentControl"' in content, "Nama binary harus BTSDocumentControl."
+    assert "openpyxl" in content, "Spec harus menyertakan openpyxl dalam hiddenimports."
 
 
 def test_build_exe_script():
@@ -46,7 +48,21 @@ def test_build_exe_script():
 
     content = build_script.read_text(encoding="utf-8")
     assert "PyInstaller" in content
-    assert "photo_rename_studio.spec" in content
+    assert "bts_document_control.spec" in content
+    assert "BTSDocumentControl.exe" in content
+
+
+def test_github_actions_workflow_configuration():
+    """Memastikan file workflow GitHub Actions untuk build Windows EXE ada dan valid."""
+    workflow_path = BASE_DIR / ".github" / "workflows" / "build-windows.yml"
+    assert workflow_path.exists(), "File .github/workflows/build-windows.yml harus ada."
+
+    content = workflow_path.read_text(encoding="utf-8")
+    assert "runs-on: windows-latest" in content, "Workflow harus berjalan di Windows runner."
+    assert "workflow_dispatch:" in content, "Workflow harus mendukung trigger manual."
+    assert "build_scripts/build_exe.py" in content, "Workflow harus menjalankan script build_exe.py."
+    assert "BTSDocumentControl-Windows-x64" in content, "Nama artifact harus sesuai."
+    assert "action-gh-release" in content, "Workflow harus mendukung auto-release pada tag."
 
 
 def test_readme_documentation_completeness():
@@ -56,7 +72,7 @@ def test_readme_documentation_completeness():
 
     content = readme_path.read_text(encoding="utf-8")
     required_keywords = [
-        "Photo Rename Studio",
+        "BTS Document Control",
         "Fitur Utama",
         "Zero Data Loss",
         "Dukungan Format File",

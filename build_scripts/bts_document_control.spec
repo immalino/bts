@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller Spec Configuration untuk Photo Rename Studio.
+PyInstaller Spec Configuration untuk BTS Document Control.
 Menghasilkan standalone Windows EXE tanpa konsol (--noconsole / --windowed).
 """
 
@@ -21,7 +21,7 @@ datas = []
 if assets_dir.exists():
     datas.append((str(assets_dir), "assets"))
 
-# Hidden imports yang krusial untuk PySide6 & Pillow
+# Hidden imports yang krusial untuk PySide6, Pillow, dan openpyxl
 hiddenimports = [
     "PIL",
     "PIL.Image",
@@ -30,6 +30,11 @@ hiddenimports = [
     "PySide6.QtCore",
     "PySide6.QtGui",
     "PySide6.QtWidgets",
+    "openpyxl",
+    "openpyxl.styles",
+    "openpyxl.utils",
+    "openpyxl.drawing.image",
+    "et_xmlfile",
 ]
 
 # Modul-modul yang tidak dipakai diexclude untuk memangkas ukuran file EXE secara drastis
@@ -86,7 +91,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="PhotoRenameStudio",
+    name="BTSDocumentControl",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -101,3 +106,4 @@ exe = EXE(
     entitlements_file=None,
     icon=str(icon_ico) if icon_ico.exists() else None,
 )
+

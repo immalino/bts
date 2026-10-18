@@ -1,5 +1,5 @@
 """
-Build Script untuk Mengemas Photo Rename Studio menjadi Executable Portabel (EXE).
+Build Script untuk Mengemas BTS Document Control menjadi Executable Portabel (EXE).
 Mendukung eksekusi di Windows (target .exe) serta testing kompilasi lokal.
 """
 
@@ -22,14 +22,14 @@ except ImportError:
 def run_build(clean: bool = True) -> int:
     """Menjalankan proses build aplikasi menggunakan PyInstaller."""
     project_root = Path(__file__).resolve().parent.parent
-    spec_path = project_root / "build_scripts" / "photo_rename_studio.spec"
+    spec_path = project_root / "build_scripts" / "bts_document_control.spec"
     assets_dir = project_root / "assets"
     icon_ico = assets_dir / "icon.ico"
     dist_dir = project_root / "dist"
     build_dir = project_root / "build"
 
     print("=" * 60)
-    print("   PHOTO RENAME STUDIO - EXECUTABLE BUILD SCRIPT")
+    print("   BTS DOCUMENT CONTROL - EXECUTABLE BUILD SCRIPT")
     print("=" * 60)
     print(f"Platform Saat Ini : {platform.system()} ({platform.machine()})")
     print(f"Python Executable : {sys.executable} (v{platform.python_version()})")
@@ -85,7 +85,7 @@ def run_build(clean: bool = True) -> int:
     print(f"[OK] Build berhasil diselesaikan dalam {elapsed:.2f} detik!")
 
     # 4. Ringkasan Hasil Build
-    exe_name = "PhotoRenameStudio.exe" if platform.system() == "Windows" else "PhotoRenameStudio"
+    exe_name = "BTSDocumentControl.exe" if platform.system() == "Windows" else "BTSDocumentControl"
     output_binary = dist_dir / exe_name
 
     if output_binary.exists():

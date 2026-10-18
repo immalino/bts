@@ -6,14 +6,14 @@ import sys
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
-from src.config import APP_ICON_ICO, APP_ICON_PNG
+from src.config import APP_ICON_ICO, APP_ICON_PNG, APP_NAME
 from src.ui.main_window import MainWindow
 from src.ui.styles import APP_STYLESHEET
 
 
 def main() -> int:
-    """Fungsi utama untuk menginisialisasi dan menjalankan aplikasi Photo Rename Studio."""
-    print("Memulai Photo Rename Studio...")
+    """Fungsi utama untuk menginisialisasi dan menjalankan aplikasi BTS Document Control."""
+    print(f"Memulai {APP_NAME}...")
     app = QApplication.instance()
     if app is None:
         app = QApplication(sys.argv)
@@ -33,7 +33,7 @@ def main() -> int:
     window.raise_()
     window.activateWindow()
 
-    print("Photo Rename Studio siap. Tutup jendela aplikasi untuk mengakhiri.")
+    print(f"{APP_NAME} siap. Tutup jendela aplikasi untuk mengakhiri.")
     return app.exec()
 
 

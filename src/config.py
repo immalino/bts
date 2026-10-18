@@ -1,10 +1,13 @@
 """
-Photo Rename Studio - Konfigurasi dan Konstanta Aplikasi
+BTS Document Control - Konfigurasi dan Konstanta Aplikasi
 """
 
 import sys
 from pathlib import Path
 from typing import Final, Tuple
+
+# Nama Aplikasi Resmi
+APP_NAME: Final[str] = "BTS Document Control"
 
 # Menentukan root direktori (kompatibel saat running script langsung maupun frozen PyInstaller)
 if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):

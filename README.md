@@ -1,6 +1,6 @@
-# Photo Rename Studio & Document Control BTS 📸📊
+# BTS Document Control & Photo Rename Studio 📸📊
 
-> **Aplikasi desktop modern, cepat, dan aman untuk penggantian nama foto massal (Tahap 1) serta Document Control & Generator Laporan Excel Lapangan BTS Telkom (Tahap 2) dengan antarmuka visual interaktif.**
+> **Aplikasi desktop modern, cepat, dan aman untuk Document Control & Generator Laporan Excel Lapangan BTS Telkom serta penggantian nama foto massal dengan antarmuka visual interaktif.**
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI Framework](https://img.shields.io/badge/GUI-PySide6%20(Qt6)-41CD52.svg)](https://wiki.qt.io/Qt_for_Python)
@@ -95,11 +95,14 @@ Aplikasi ini mengatasi tantangan utama tim lapangan telekomunikasi dan Document 
 
 ```text
 my-bts/
+├── .github/
+│   └── workflows/
+│       └── build-windows.yml        # CI/CD otomatis kompilasi Windows EXE
 ├── assets/                          # Aset visual (icon.png, icon.ico)
 ├── build_scripts/                   # Skrip otomatisasi packaging EXE
 │   ├── build_exe.py                 # Runner build PyInstaller
 │   ├── generate_icons.py            # Generator ikon resolusi tinggi
-│   └── photo_rename_studio.spec     # Konfigurasi PyInstaller Windows
+│   └── bts_document_control.spec    # Konfigurasi PyInstaller Windows
 ├── src/                             # Kode Sumber Utama
 │   ├── config.py                    # Konstanta, tema warna & ekstensi
 │   ├── main.py                      # Titik masuk aplikasi (Entry Point)
@@ -228,22 +231,50 @@ my-bts/
 
 ## 📦 Panduan Build Windows EXE Portabel
 
-Aplikasi dapat dikompilasi menjadi satu file eksekutabel tunggal portabel (`.exe`) yang berjalan di Windows tanpa perlu menginstal Python di komputer target:
+PyInstaller mengemas aplikasi berdasarkan sistem operasi host tempat skrip dijalankan. Untuk menghasilkan file `.exe` Windows murni, terdapat dua metode:
+
+### Metode 1: Menggunakan GitHub Actions CI/CD (Otomatis & Direkomendasikan)
+Jika Anda menggunakan **Linux / macOS** dan tidak memiliki mesin Windows, gunakan GitHub Actions yang disediakan pada `.github/workflows/build-windows.yml`:
+
+1. **Push Repository ke GitHub:**
+   ```bash
+   git remote add origin https://github.com/<username>/<repo>.git
+   git push -u origin master
+   ```
+2. **Trigger Build Manual (Kapan Saja):**
+   - Buka tab **Actions** di repository GitHub Anda.
+   - Klik workflow **Build Windows Executable** di panel sebelah kiri.
+   - Klik tombol **Run workflow** -> pilih branch `master` -> klik **Run workflow**.
+3. **Unduh File EXE:**
+   - Setelah proses selesai (~1-2 menit), buka riwayat run tersebut.
+   - Pada bagian **Artifacts** di bawah halaman, unduh paket **`BTSDocumentControl-Windows-x64`**.
+   - Ekstrak file zip dan Anda akan mendapatkan `BTSDocumentControl.exe` siap pakai.
+4. **Auto-Release dengan Git Tag:**
+   Setiap kali Anda membuat tag versi (contoh `v1.0.0`), GitHub Actions akan otomatis membuat entri di tab **Releases** dengan biner `BTSDocumentControl.exe` terlampir:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+
+---
+
+### Metode 2: Kompilasi Lokal Langsung di Komputer Windows
+Jika Anda memiliki komputer Windows dengan Python 3.10+ terinstal:
 
 ```powershell
-pip install pyinstaller
+pip install -r requirements.txt
 python build_scripts/build_exe.py
 ```
 
-### Parameter Konfigurasi PyInstaller yang Digunakan:
-- `--noconsole` / `--windowed`: Mencegah jendela console DOS muncul di belakang aplikasi.
-- `--onefile`: Mengemas seluruh komponen ke dalam satu file biner tunggal portabel.
+### Parameter Konfigurasi PyInstaller:
+- `--noconsole` / `--windowed`: Mencegah jendela console DOS hitam muncul di belakang GUI.
+- `--onefile`: Mengemas seluruh kode, dependensi, dan aset ke dalam satu file biner tunggal portabel.
 - `--icon "assets/icon.ico"`: Menyematkan ikon resmi aplikasi pada file `.exe`.
-- `--add-data "assets;assets"`: Memasukkan bundel aset ikon ke dalam aplikasi.
+- `--add-data "assets;assets"`: Memasukkan bundel aset ikon dan tema ke dalam aplikasi.
 
 File portabel siap digunakan berada di:
 ```text
-dist/PhotoRenameStudio.exe
+dist/BTSDocumentControl.exe
 ```
 
 ---

@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 )
 from datetime import datetime
 
-from src.config import APP_ICON_ICO, APP_ICON_PNG, BASE_DIR, DEFAULT_ROW_COUNT, ThemeColors
+from src.config import APP_ICON_ICO, APP_ICON_PNG, APP_NAME, BASE_DIR, DEFAULT_ROW_COUNT, ThemeColors
 from src.core.excel_generator import ExcelGeneratorThread
 from src.core.exporter import ExportTask, ExporterThread
 from src.core.importer import import_names_from_csv, import_names_from_txt
@@ -74,7 +74,7 @@ class MainWindow(QMainWindow):
 
 
     def _init_ui(self) -> None:
-        self.setWindowTitle("Photo Rename Studio")
+        self.setWindowTitle(APP_NAME)
         self.resize(1024, 768)
         self.setMinimumSize(880, 600)
 
@@ -116,7 +116,7 @@ class MainWindow(QMainWindow):
         header_top_layout = QHBoxLayout()
         header_top_layout.setSpacing(10)
 
-        title_label = QLabel("Photo Rename Studio", header_card)
+        title_label = QLabel(APP_NAME, header_card)
         title_label.setStyleSheet(f"""
             font-size: 18px;
             font-weight: 700;
