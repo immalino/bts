@@ -6,7 +6,7 @@ import os
 import re
 from typing import Any, Dict, List, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -34,6 +35,7 @@ from src.core.importer import import_names_from_csv, import_names_from_txt
 from src.core.models import ProjectData, TemplateConfig
 from src.core.storage import StorageManager
 from src.core.validator import validate_batch
+from src.ui.document_tabs import AddDocumentDialog, DocumentTabBar
 from src.ui.dynamic_row import DynamicPhotoRow, DynamicTextRow
 from src.ui.empty_state import WorkspaceEmptyState
 from src.ui.icons import get_icon, render_svg_pixmap
@@ -61,6 +63,7 @@ class MainWindow(QMainWindow):
         self,
         default_rows: int = DEFAULT_ROW_COUNT,
         storage: Optional[StorageManager] = None,
+        auto_load_last_project: bool = False,
     ):
         super().__init__()
         self.storage: StorageManager = storage or StorageManager()
@@ -71,10 +74,17 @@ class MainWindow(QMainWindow):
         self.row_widgets: List[RowWidget] = []
         self.exporter_thread: Optional[ExporterThread] = None
         self.excel_generator_thread: Optional[ExcelGeneratorThread] = None
+        self.auto_load_last_project: bool = auto_load_last_project
 
         self._init_ui()
         self._setup_connections()
-        self.init_rows(self.default_rows_count)
+
+        loaded = False
+        if self.auto_load_last_project:
+            loaded = self.load_last_opened_project()
+
+        if not loaded:
+            self.init_rows(self.default_rows_count)
 
 
     def _init_ui(self) -> None:
@@ -333,6 +343,15 @@ class MainWindow(QMainWindow):
         toolbar_vlayout.addWidget(self.filter_container)
 
         self.main_layout.addWidget(toolbar_card)
+
+        # Document Tab Bar untuk Multi-Dokumen Site
+        self.document_tab_bar = DocumentTabBar(self)
+        self.document_tab_bar.document_selected.connect(self._on_document_tab_selected)
+        self.document_tab_bar.add_document_requested.connect(self._on_add_document_clicked)
+        self.document_tab_bar.remove_document_requested.connect(self._on_remove_document_clicked)
+        self.document_tab_bar.rename_document_requested.connect(self._on_rename_document_clicked)
+        self.document_tab_bar.setVisible(False)
+        self.main_layout.addWidget(self.document_tab_bar)
 
     def _create_scroll_area_section(self) -> None:
         """Membuat area QScrollArea vertikal untuk menampung baris-baris foto dan empty state."""
@@ -604,8 +623,27 @@ class MainWindow(QMainWindow):
         site_name = self.current_project.site_name if self.current_project else "(Belum dipilih)"
         self.lbl_active_site.setText(f"Site: {site_name}")
 
+        doc_suffix = ""
+        if self.current_project and hasattr(self.current_project, "get_active_document"):
+            active_doc = self.current_project.get_active_document()
+            if active_doc and active_doc.name:
+                doc_suffix = f" [{active_doc.name}]"
+
         template_name = self.current_template.name if self.current_template else "(Belum dipilih)"
-        self.lbl_active_template.setText(f"Template: {template_name}")
+        self.lbl_active_template.setText(f"Template: {template_name}{doc_suffix}")
+
+    def load_last_opened_project(self) -> bool:
+        """Membuka otomatis proyek site terakhir yang dikerjakan pengguna."""
+        settings = QSettings("BTSDocumentControl", "WorkspaceSettings")
+        last_id = settings.value("last_project_id", "")
+        if last_id:
+            try:
+                project = self.storage.load_project(str(last_id))
+                self.set_project(project)
+                return True
+            except Exception:
+                pass
+        return False
 
     def open_project_manager(self) -> None:
         """Membuka dialog ProjectManagerDialog untuk memilih atau membuat site baru."""
@@ -628,8 +666,21 @@ class MainWindow(QMainWindow):
         Menyetel proyek site aktif, memuat template terkait, dan me-render workspace dinamis.
         """
         self.current_project = project
+
+        # Persistensikan last_project_id ke QSettings
+        settings = QSettings("BTSDocumentControl", "WorkspaceSettings")
+        settings.setValue("last_project_id", project.project_id)
+
+        # Update document tab bar
+        if hasattr(self, "document_tab_bar"):
+            self.document_tab_bar.update_documents(project, self.storage)
+            self.document_tab_bar.setVisible(True)
+
+        active_doc = project.get_active_document()
+        template_id = active_doc.template_id if active_doc else project.template_id
+
         try:
-            self.current_template = self.storage.load_template(project.template_id)
+            self.current_template = self.storage.load_template(template_id)
         except Exception:
             self.current_template = None
 
@@ -641,7 +692,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "Template Tidak Ditemukan",
-                f"Template ID '{project.template_id}' tidak ditemukan di penyimpanan.\n"
+                f"Template ID '{template_id}' tidak ditemukan di penyimpanan.\n"
                 "Silakan pilih atau buat template melalui tombol 'Kelola Template'.",
             )
 
@@ -652,10 +703,139 @@ class MainWindow(QMainWindow):
         self.current_template = template
         if self.current_project:
             self.current_project.template_id = template.template_id
+            active_doc = self.current_project.get_active_document()
+            if active_doc:
+                active_doc.template_id = template.template_id
             self.storage.save_project(self.current_project)
+            if hasattr(self, "document_tab_bar"):
+                self.document_tab_bar.update_documents(self.current_project, self.storage)
 
         self._update_header_info()
         self.render_dynamic_workspace(template, self.current_project)
+
+    def _flush_active_rows_to_project(self) -> None:
+        """Simpan seluruh nilai dynamic_rows yang ada di layar ke current_project/active_doc."""
+        if not self.current_project:
+            return
+        photos = {}
+        texts = {}
+        for row in self.dynamic_rows:
+            fld_id = row.get_field_id()
+            if isinstance(row, DynamicPhotoRow):
+                p = row.get_photo()
+                if p:
+                    photos[fld_id] = p
+            elif isinstance(row, DynamicTextRow):
+                t = row.get_text()
+                if t:
+                    texts[fld_id] = t
+        self.current_project.sync_active_assignments(photos, texts)
+
+    def _on_document_tab_selected(self, doc_id: str) -> None:
+        """Handler saat pengguna mengklik tab sub-dokumen."""
+        if not self.current_project:
+            return
+        if self.current_project.active_doc_id == doc_id:
+            return
+
+        # 1. Simpan perubahan baris aktif ke dokumen saat ini
+        self._flush_active_rows_to_project()
+
+        # 2. Beralih ke dokumen baru
+        if self.current_project.switch_document(doc_id):
+            self.storage.save_project(self.current_project)
+            self.document_tab_bar.set_active_document(doc_id)
+
+            active_doc = self.current_project.get_active_document()
+            if active_doc:
+                try:
+                    self.current_template = self.storage.load_template(active_doc.template_id)
+                except Exception:
+                    self.current_template = None
+
+                self._update_header_info()
+                if self.current_template:
+                    self.render_dynamic_workspace(self.current_template, self.current_project)
+
+    def _on_add_document_clicked(self) -> None:
+        """Handler saat tombol + Tambah Dokumen diklik."""
+        if not self.current_project:
+            QMessageBox.information(self, "Informasi", "Silakan pilih atau buat proyek site terlebih dahulu.")
+            return
+
+        dlg = AddDocumentDialog(storage=self.storage, parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._flush_active_rows_to_project()
+            new_doc = self.current_project.add_document(
+                template_id=dlg.selected_template_id,
+                name=dlg.document_name,
+            )
+            self.current_project.switch_document(new_doc.doc_id)
+            self.storage.save_project(self.current_project)
+
+            self.document_tab_bar.update_documents(self.current_project, self.storage)
+            try:
+                self.current_template = self.storage.load_template(new_doc.template_id)
+            except Exception:
+                self.current_template = None
+
+            self._update_header_info()
+            if self.current_template:
+                self.render_dynamic_workspace(self.current_template, self.current_project)
+
+    def _on_remove_document_clicked(self, doc_id: str) -> None:
+        """Handler saat tombol x pada tab dokumen diklik."""
+        if not self.current_project:
+            return
+        doc = self.current_project.get_document_by_id(doc_id)
+        if not doc:
+            return
+
+        doc_name = doc.name or f"Dokumen ({doc.doc_id})"
+        reply = QMessageBox.question(
+            self,
+            "Konfirmasi Hapus Dokumen",
+            f"Apakah Anda yakin ingin menghapus '{doc_name}' dari site ini?\n"
+            "Daftar foto yang sudah terpasang pada dokumen ini akan dihapus dari proyek.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self._flush_active_rows_to_project()
+            self.current_project.remove_document(doc_id)
+            self.storage.save_project(self.current_project)
+            self.document_tab_bar.update_documents(self.current_project, self.storage)
+
+            active_doc = self.current_project.get_active_document()
+            if active_doc:
+                try:
+                    self.current_template = self.storage.load_template(active_doc.template_id)
+                except Exception:
+                    self.current_template = None
+                self._update_header_info()
+                if self.current_template:
+                    self.render_dynamic_workspace(self.current_template, self.current_project)
+
+    def _on_rename_document_clicked(self, doc_id: str) -> None:
+        """Handler saat pengguna mengganti nama dokumen."""
+        if not self.current_project:
+            return
+        doc = self.current_project.get_document_by_id(doc_id)
+        if not doc:
+            return
+
+        new_name, ok = QInputDialog.getText(
+            self,
+            "Ganti Nama Dokumen",
+            "Masukkan nama baru untuk dokumen ini:",
+            QLineEdit.EchoMode.Normal,
+            doc.name,
+        )
+        if ok and new_name.strip():
+            self.current_project.rename_document(doc_id, new_name.strip())
+            self.storage.save_project(self.current_project)
+            self.document_tab_bar.update_documents(self.current_project, self.storage)
+            self._update_header_info()
 
     def render_dynamic_workspace(
         self,
@@ -717,12 +897,19 @@ class MainWindow(QMainWindow):
         Auto-save perubahan foto ke data proyek aktif dan persistensi ke storage.
         """
         if self.current_project:
+            active_doc = self.current_project.get_active_document()
             if photo_path:
                 self.current_project.photo_assignments[field_id] = photo_path
+                if active_doc:
+                    active_doc.photo_assignments[field_id] = photo_path
             else:
                 self.current_project.photo_assignments.pop(field_id, None)
+                if active_doc:
+                    active_doc.photo_assignments.pop(field_id, None)
 
             self.storage.save_project(self.current_project)
+            if hasattr(self, "document_tab_bar"):
+                self.document_tab_bar.update_documents(self.current_project, self.storage)
 
         self.update_summary_stats()
 
@@ -731,12 +918,19 @@ class MainWindow(QMainWindow):
         Auto-save perubahan teks ke data proyek aktif dan persistensi ke storage.
         """
         if self.current_project:
+            active_doc = self.current_project.get_active_document()
             if text_value:
                 self.current_project.text_assignments[field_id] = text_value
+                if active_doc:
+                    active_doc.text_assignments[field_id] = text_value
             else:
                 self.current_project.text_assignments.pop(field_id, None)
+                if active_doc:
+                    active_doc.text_assignments.pop(field_id, None)
 
             self.storage.save_project(self.current_project)
+            if hasattr(self, "document_tab_bar"):
+                self.document_tab_bar.update_documents(self.current_project, self.storage)
 
         self.update_summary_stats()
 
@@ -751,6 +945,8 @@ class MainWindow(QMainWindow):
 
         if hasattr(self, "filter_container"):
             self.filter_container.setVisible(False)
+        if hasattr(self, "document_tab_bar"):
+            self.document_tab_bar.setVisible(False)
         if hasattr(self, "empty_state"):
             self.empty_state.setVisible(count == 0)
 

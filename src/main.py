@@ -27,8 +27,8 @@ def main() -> int:
     # Terapkan stylesheet global
     app.setStyleSheet(APP_STYLESHEET)
 
-    # Inisialisasi dan tampilkan jendela utama
-    window = MainWindow()
+    # Inisialisasi dan tampilkan jendela utama (otomatis memuat site terakhir atau empty state)
+    window = MainWindow(default_rows=0, auto_load_last_project=True)
     window.show()
     window.raise_()
     window.activateWindow()
