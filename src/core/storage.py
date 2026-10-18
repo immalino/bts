@@ -230,3 +230,4 @@ class StorageManager:
             target_file.unlink()
             return True
         return False
+

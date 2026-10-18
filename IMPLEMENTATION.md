@@ -768,19 +768,19 @@ Membangun engine inti pembuat dokumen Excel berbasis `openpyxl` di dalam thread 
 - `tests/test_excel_generator.py` (unit test generator dengan template dummy)
 
 #### 📋 Checklist Tugas Sesi 9
-- [ ] Buat `src/utils/excel_utils.py`:
+- [x] Buat `src/utils/excel_utils.py`:
   - `get_cell_dimensions(worksheet, cell_coordinate) -> Tuple[int, int]` (mengembalikan lebar & tinggi dalam piksel, termasuk kalkulasi rentang *merged cells*).
   - `calculate_fitted_dimensions(img_width, img_height, max_width, max_height, padding) -> Tuple[int, int]`.
-- [ ] Buat `src/core/excel_generator.py`:
+- [x] Buat `src/core/excel_generator.py`:
   - Class `ExcelGeneratorThread(QThread)` dengan signal:
     - `progress_updated(current_step: int, total_steps: int, message: str)`
     - `item_finished(field_id: str, success: bool, message: str)`
     - `generation_completed(output_path: str, success_count: int, fail_count: int, errors: list)`
   - Proses: Buka template asli via `openpyxl.load_workbook()`, iterasi field foto, baca file gambar, orientasikan EXIF secara benar via Pillow, resize proporsional sesuai dimensi sel target, tempel ke sheet via `ws.add_image(img, cell_anchor)`, dan simpan ke file tujuan.
-- [ ] Buat unit test di `tests/test_excel_generator.py`:
+- [x] Buat unit test di `tests/test_excel_generator.py`:
   - Pengujian pembuatan file Excel dengan 3 sheet dan sel merged.
   - Pengujian verifikasi gambar terpasang di sheet yang sesuai dan dimensi sel dihormati.
-- [ ] Jalankan `pytest tests/test_excel_generator.py` dan pastikan 100% PASSED.
+- [x] Jalankan `pytest tests/test_excel_generator.py` dan pastikan 100% PASSED.
 
 #### 🧪 Cara Verifikasi Sesi 9
 ```bash

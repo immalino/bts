@@ -304,3 +304,4 @@ class TestStorageManager:
         projects = storage.list_projects()
         assert len(projects) == 1
         assert projects[0].project_id == "valid_proj"
+
