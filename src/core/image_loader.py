@@ -8,19 +8,20 @@ import os
 import sys
 
 from PIL import Image, ImageOps
-from PySide6.QtGui import QGuiApplication, QImage, QPixmap
+from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtWidgets import QApplication
 
 from src.config import THUMBNAIL_SIZE
 
 
-def _ensure_gui_app() -> Optional[QGuiApplication]:
-    """Memastikan instance QGuiApplication ada agar QPixmap dapat dibuat."""
-    app = QGuiApplication.instance()
+def _ensure_gui_app() -> Optional[QApplication]:
+    """Memastikan instance QApplication ada agar QPixmap dan widget dapat dibuat."""
+    app = QApplication.instance()
     if app is None:
         # Gunakan platform offscreen jika tidak ada DISPLAY (misal saat unit test / headless)
         if "QT_QPA_PLATFORM" not in os.environ and "DISPLAY" not in os.environ:
             os.environ["QT_QPA_PLATFORM"] = "offscreen"
-        app = QGuiApplication(sys.argv)
+        app = QApplication(sys.argv)
     return app
 
 

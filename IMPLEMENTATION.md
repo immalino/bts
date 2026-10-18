@@ -405,9 +405,9 @@ Merangkai jendela utama aplikasi, menampung 100 baris awal di dalam `QScrollArea
 - `src/main.py` (update untuk membuka MainWindow)
 
 #### 📋 Checklist Tugas Sesi 5
-- [ ] Buat modul styling `src/ui/styles.py`:
+- [x] Buat modul styling `src/ui/styles.py`:
   - Desain modern, warna bersih (clean light/dark theme), tombol ergonomis, font jelas, padding rapi.
-- [ ] Buat `src/ui/main_window.py`:
+- [x] Buat `src/ui/main_window.py`:
   - **Header & Info**: Judul aplikasi, instruksi ringkas penggunaan.
   - **Toolbar Aksi Atas**:
     - Tombol "📂 Impor Daftar Nama (TXT/CSV)"
@@ -420,9 +420,9 @@ Merangkai jendela utama aplikasi, menampung 100 baris awal di dalam `QScrollArea
     - Field input path folder tujuan (read-only atau editable).
     - Tombol "Pilih Folder" (`QFileDialog.getExistingDirectory`).
     - Checkbox opsi: "Izinkan menimpa file yang sudah ada (Overwrite)".
-- [ ] Sambungkan fitur Impor TXT/CSV ke baris-baris yang ada:
+- [x] Sambungkan fitur Impor TXT/CSV ke baris-baris yang ada:
   - Jika file yang diimpor memiliki lebih dari jumlah baris saat ini, baris baru ditambahkan otomatis.
-- [ ] Update `src/main.py` untuk menginstansiasi dan menampilkan `MainWindow`.
+- [x] Update `src/main.py` untuk menginstansiasi dan menampilkan `MainWindow`.
 
 #### 🧪 Cara Verifikasi Sesi 5
 Jalankan aplikasi utama di terminal:
