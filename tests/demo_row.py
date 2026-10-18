@@ -161,21 +161,25 @@ def main():
     window = DemoRowWindow()
     window.show()
 
-    # Buat sampel gambar dummy untuk pengujian otomatis jika running headless/test
-    import tempfile
-    from PIL import Image
+    # Jika dipanggil dengan flag --test atau dalam mode offscreen, jalankan verifikasi otomatis
+    is_headless = "QT_QPA_PLATFORM" in os.environ and os.environ["QT_QPA_PLATFORM"] == "offscreen"
+    is_test_mode = "--test" in sys.argv or is_headless
 
-    temp_dir = tempfile.mkdtemp()
-    sample_img = os.path.join(temp_dir, "foto_santri_01.jpg")
-    img = Image.new("RGB", (200, 200), color=(73, 109, 137))
-    img.save(sample_img)
+    if is_test_mode:
+        import tempfile
+        from PIL import Image
 
-    run_automated_verification(window, sample_img)
-    window._print_data()
+        temp_dir = tempfile.mkdtemp()
+        sample_img = os.path.join(temp_dir, "foto_santri_01.jpg")
+        img = Image.new("RGB", (200, 200), color=(73, 109, 137))
+        img.save(sample_img)
 
-    if "QT_QPA_PLATFORM" in os.environ and os.environ["QT_QPA_PLATFORM"] == "offscreen":
-        print("Demo selesai dieksekusi dalam mode offscreen.")
-        return 0
+        run_automated_verification(window, sample_img)
+        window._print_data()
+
+        if is_headless:
+            print("Demo selesai dieksekusi dalam mode offscreen.")
+            return 0
 
     return app.exec()
 
