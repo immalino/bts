@@ -35,11 +35,15 @@ from src.core.models import ProjectData, TemplateConfig
 from src.core.storage import StorageManager
 from src.core.validator import validate_batch
 from src.ui.dynamic_row import DynamicPhotoRow, DynamicTextRow
+from src.ui.empty_state import WorkspaceEmptyState
+from src.ui.icons import get_icon, render_svg_pixmap
 from src.ui.project_dialog import ProjectManagerDialog
 from src.ui.report_dialog import ReportDialog
 from src.ui.row_widget import RowStatus, RowWidget
+from src.ui.styles import ThemeManager, ThemePalette
 from src.ui.template_dialog import TemplateManagerDialog
-from src.utils.file_utils import split_filename_and_ext
+from src.utils.file_utils import open_folder_in_explorer, reveal_in_explorer, split_filename_and_ext
+
 
 
 class MainWindow(QMainWindow):
@@ -105,16 +109,23 @@ class MainWindow(QMainWindow):
         self._create_footer_section()
 
     def _create_header_section(self) -> None:
-        """Membuat bagian header dengan judul, info site & template aktif, dan panduan ringkas."""
+        """Membuat bagian header dengan judul, info site & template aktif, dan theme toggle."""
         header_card = QFrame(self)
         header_card.setObjectName("HeaderCard")
         header_layout = QVBoxLayout(header_card)
         header_layout.setContentsMargins(16, 12, 16, 12)
         header_layout.setSpacing(6)
 
-        # Baris Header: Judul & Status Badge Site/Template
+        # Baris Header: Logo/Judul & Status Badge Site/Template & Theme Toggle
         header_top_layout = QHBoxLayout()
         header_top_layout.setSpacing(10)
+
+        title_container = QHBoxLayout()
+        title_container.setSpacing(8)
+
+        lbl_logo = QLabel(header_card)
+        lbl_logo.setPixmap(render_svg_pixmap("camera", color="#2563EB", size=22))
+        title_container.addWidget(lbl_logo)
 
         title_label = QLabel(APP_NAME, header_card)
         title_label.setStyleSheet(f"""
@@ -122,7 +133,21 @@ class MainWindow(QMainWindow):
             font-weight: 700;
             color: {ThemeColors.TEXT};
         """)
-        header_top_layout.addWidget(title_label)
+        title_container.addWidget(title_label)
+
+        lbl_version = QLabel("v2.0", header_card)
+        lbl_version.setStyleSheet(f"""
+            background-color: {ThemeColors.SURFACE};
+            color: {ThemeColors.TEXT_MUTED};
+            border: 1px solid {ThemeColors.BORDER};
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-size: 10px;
+            font-weight: 600;
+        """)
+        title_container.addWidget(lbl_version)
+        header_top_layout.addLayout(title_container)
+
         header_top_layout.addStretch(1)
 
         # Badge Site Aktif
@@ -132,7 +157,7 @@ class MainWindow(QMainWindow):
             color: {ThemeColors.PRIMARY};
             border: 1px solid #BFDBFE;
             border-radius: 4px;
-            padding: 3px 8px;
+            padding: 4px 10px;
             font-size: 11px;
             font-weight: 600;
         """)
@@ -145,11 +170,21 @@ class MainWindow(QMainWindow):
             color: {ThemeColors.TEXT_MUTED};
             border: 1px solid {ThemeColors.BORDER};
             border-radius: 4px;
-            padding: 3px 8px;
+            padding: 4px 10px;
             font-size: 11px;
             font-weight: 600;
         """)
         header_top_layout.addWidget(self.lbl_active_template)
+
+        # Tombol Toggle Dark / Light Mode
+        self.btn_theme_toggle = QPushButton(" Dark", header_card)
+        self.btn_theme_toggle.setObjectName("GhostButton")
+        self.btn_theme_toggle.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_theme_toggle.setToolTip("Ganti Mode Tampilan (Light / Dark Mode)")
+        self._update_theme_toggle_icon()
+        self.btn_theme_toggle.clicked.connect(self.toggle_theme)
+        header_top_layout.addWidget(self.btn_theme_toggle)
+
         header_layout.addLayout(header_top_layout)
 
         guide_label = QLabel(
@@ -167,65 +202,77 @@ class MainWindow(QMainWindow):
         self.main_layout.addWidget(header_card)
 
     def _create_toolbar_section(self) -> None:
-        """Membuat toolbar aksi di bagian atas."""
+        """Membuat toolbar aksi di bagian atas lengkap dengan pencarian dan filter."""
         toolbar_card = QFrame(self)
         toolbar_card.setObjectName("ToolbarCard")
-        toolbar_layout = QHBoxLayout(toolbar_card)
-        toolbar_layout.setContentsMargins(14, 10, 14, 10)
-        toolbar_layout.setSpacing(10)
+        toolbar_vlayout = QVBoxLayout(toolbar_card)
+        toolbar_vlayout.setContentsMargins(14, 10, 14, 10)
+        toolbar_vlayout.setSpacing(8)
+
+        # Baris 1: Tombol Aksi Utama & Indikator Kesiapan
+        toolbar_top_layout = QHBoxLayout()
+        toolbar_top_layout.setSpacing(8)
 
         # Tombol Ganti / Pilih Site
         self.btn_select_site = QPushButton("Ganti / Pilih Site", toolbar_card)
         self.btn_select_site.setObjectName("PrimaryButton")
-        self.btn_select_site.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DesktopIcon))
+        self.btn_select_site.setIcon(get_icon("building", color="#FFFFFF", size=14))
         self.btn_select_site.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_select_site.setToolTip("Pilih proyek site yang aktif atau buat proyek site baru")
-        toolbar_layout.addWidget(self.btn_select_site)
+        toolbar_top_layout.addWidget(self.btn_select_site)
 
         # Tombol Kelola Template
         self.btn_manage_template = QPushButton("Kelola Template", toolbar_card)
-        self.btn_manage_template.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        self.btn_manage_template.setIcon(get_icon("file_spreadsheet", size=14))
         self.btn_manage_template.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_manage_template.setToolTip("Buka dialog manajemen template laporan Excel")
-        toolbar_layout.addWidget(self.btn_manage_template)
+        toolbar_top_layout.addWidget(self.btn_manage_template)
 
         # Separator visual
         sep = QFrame(toolbar_card)
         sep.setFrameShape(QFrame.Shape.VLine)
         sep.setFrameShadow(QFrame.Shadow.Sunken)
-        sep.setStyleSheet(f"color: {ThemeColors.BORDER};")
-        toolbar_layout.addWidget(sep)
+        toolbar_top_layout.addWidget(sep)
 
         # Tombol Impor
         self.btn_import = QPushButton("Impor Nama (TXT/CSV)", toolbar_card)
-        self.btn_import.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton))
+        self.btn_import.setIcon(get_icon("download", size=14))
         self.btn_import.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_import.setToolTip("Impor daftar nama dari file .txt atau .csv")
-        toolbar_layout.addWidget(self.btn_import)
+        toolbar_top_layout.addWidget(self.btn_import)
 
         # Tombol Tambah Baris
         self.btn_add_row = QPushButton("Tambah Baris", toolbar_card)
-        self.btn_add_row.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogNewFolder))
+        self.btn_add_row.setIcon(get_icon("plus", size=14))
         self.btn_add_row.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_add_row.setToolTip("Tambahkan 1 baris baru di posisi paling bawah")
-        toolbar_layout.addWidget(self.btn_add_row)
+        toolbar_top_layout.addWidget(self.btn_add_row)
 
         # Tombol Hapus Baris Kosong
         self.btn_remove_empty = QPushButton("Hapus Baris Kosong", toolbar_card)
-        self.btn_remove_empty.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
+        self.btn_remove_empty.setIcon(get_icon("trash", size=14))
         self.btn_remove_empty.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_remove_empty.setToolTip("Hapus semua baris yang tidak memiliki foto dan nama")
-        toolbar_layout.addWidget(self.btn_remove_empty)
+        toolbar_top_layout.addWidget(self.btn_remove_empty)
 
         # Tombol Reset
         self.btn_reset = QPushButton("Reset Semua", toolbar_card)
         self.btn_reset.setObjectName("DangerButton")
-        self.btn_reset.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
+        self.btn_reset.setIcon(get_icon("refresh", size=14))
         self.btn_reset.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_reset.setToolTip("Kembalikan semua baris dan pengaturan ke kondisi awal")
-        toolbar_layout.addWidget(self.btn_reset)
+        toolbar_top_layout.addWidget(self.btn_reset)
 
-        toolbar_layout.addStretch(1)
+        toolbar_top_layout.addStretch(1)
+
+        # Mini Readiness Bar
+        self.readiness_bar = QProgressBar(toolbar_card)
+        self.readiness_bar.setFixedSize(100, 8)
+        self.readiness_bar.setRange(0, 100)
+        self.readiness_bar.setValue(0)
+        self.readiness_bar.setTextVisible(False)
+        self.readiness_bar.setVisible(False)
+        toolbar_top_layout.addWidget(self.readiness_bar)
 
         # Label Statistik Baris
         self.lbl_stats = QLabel("Total: 0 baris | Foto: 0 | Siap: 0", toolbar_card)
@@ -234,12 +281,61 @@ class MainWindow(QMainWindow):
             font-weight: 600;
             color: {ThemeColors.TEXT_MUTED};
         """)
-        toolbar_layout.addWidget(self.lbl_stats)
+        toolbar_top_layout.addWidget(self.lbl_stats)
+
+        toolbar_vlayout.addLayout(toolbar_top_layout)
+
+        # Baris 2: Search & Filter Controls (Instant Filter Bar)
+        self.filter_container = QWidget(toolbar_card)
+        filter_layout = QHBoxLayout(self.filter_container)
+        filter_layout.setContentsMargins(0, 2, 0, 0)
+        filter_layout.setSpacing(8)
+
+        lbl_search_icon = QLabel(self.filter_container)
+        lbl_search_icon.setPixmap(render_svg_pixmap("search", size=14))
+        filter_layout.addWidget(lbl_search_icon)
+
+        self.input_search = QLineEdit(self.filter_container)
+        self.input_search.setPlaceholderText("Cari nama field foto, sheet, atau sel Excel (misal 'Antenna', 'B5')...")
+        self.input_search.setFixedHeight(30)
+        self.input_search.textChanged.connect(self._on_search_text_changed)
+        filter_layout.addWidget(self.input_search, stretch=1)
+
+        lbl_filter = QLabel("Filter:", self.filter_container)
+        lbl_filter.setStyleSheet("font-size: 11px; font-weight: 600;")
+        filter_layout.addWidget(lbl_filter)
+
+        self.active_status_filter = "all"
+        self.btn_filter_all = QPushButton("Semua", self.filter_container)
+        self.btn_filter_all.setFixedHeight(28)
+        self.btn_filter_all.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_filter_all.clicked.connect(lambda: self._set_status_filter("all"))
+        filter_layout.addWidget(self.btn_filter_all)
+
+        self.btn_filter_empty = QPushButton("Belum Terisi", self.filter_container)
+        self.btn_filter_empty.setFixedHeight(28)
+        self.btn_filter_empty.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_filter_empty.clicked.connect(lambda: self._set_status_filter("empty"))
+        filter_layout.addWidget(self.btn_filter_empty)
+
+        self.btn_filter_filled = QPushButton("Sudah Terisi", self.filter_container)
+        self.btn_filter_filled.setFixedHeight(28)
+        self.btn_filter_filled.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_filter_filled.clicked.connect(lambda: self._set_status_filter("filled"))
+        filter_layout.addWidget(self.btn_filter_filled)
+
+        self.lbl_filter_stats = QLabel("", self.filter_container)
+        self.lbl_filter_stats.setStyleSheet("font-size: 11px; font-weight: 500;")
+        self.lbl_filter_stats.setVisible(False)
+        filter_layout.addWidget(self.lbl_filter_stats)
+
+        self._update_filter_button_styles()
+        toolbar_vlayout.addWidget(self.filter_container)
 
         self.main_layout.addWidget(toolbar_card)
 
     def _create_scroll_area_section(self) -> None:
-        """Membuat area QScrollArea vertikal untuk menampung baris-baris foto."""
+        """Membuat area QScrollArea vertikal untuk menampung baris-baris foto dan empty state."""
         self.scroll_area = QScrollArea(self)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -249,6 +345,13 @@ class MainWindow(QMainWindow):
         self.rows_layout = QVBoxLayout(self.scroll_content)
         self.rows_layout.setContentsMargins(6, 6, 6, 6)
         self.rows_layout.setSpacing(6)
+
+        # Onboarding Empty State Widget
+        self.empty_state = WorkspaceEmptyState(self.scroll_content)
+        self.empty_state.select_site_clicked.connect(self.open_project_manager)
+        self.empty_state.manage_template_clicked.connect(self.open_template_manager)
+        self.empty_state.setVisible(False)
+        self.rows_layout.addWidget(self.empty_state)
 
         self.scroll_area.setWidget(self.scroll_content)
         self.main_layout.addWidget(self.scroll_area, stretch=1)
@@ -275,7 +378,7 @@ class MainWindow(QMainWindow):
         dir_layout.addWidget(self.input_output_dir, stretch=1)
 
         self.btn_browse_dir = QPushButton("Pilih Folder", self.footer_card)
-        self.btn_browse_dir.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton))
+        self.btn_browse_dir.setIcon(get_icon("folder", size=14))
         self.btn_browse_dir.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_browse_dir.setFixedWidth(130)
         dir_layout.addWidget(self.btn_browse_dir)
@@ -313,13 +416,13 @@ class MainWindow(QMainWindow):
 
         footer_layout.addLayout(progress_layout)
 
-        # Baris 4: Tombol Aksi Ekspor & Tombol Batal
+        # Baris 4: Tombol Aksi Ekspor & Tombol Pintas
         action_layout = QHBoxLayout()
         action_layout.setSpacing(10)
 
         self.btn_cancel_export = QPushButton("Batal Proses", self.footer_card)
         self.btn_cancel_export.setObjectName("DangerButton")
-        self.btn_cancel_export.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCancelButton))
+        self.btn_cancel_export.setIcon(get_icon("x", size=14))
         self.btn_cancel_export.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_cancel_export.setEnabled(False)
         self.btn_cancel_export.setVisible(False)
@@ -327,9 +430,24 @@ class MainWindow(QMainWindow):
 
         action_layout.addStretch(1)
 
+        # Tombol Pintas Pasca-Ekspor (Handover)
+        self.btn_open_excel = QPushButton("Buka Dokumen Excel", self.footer_card)
+        self.btn_open_excel.setIcon(get_icon("file_spreadsheet", size=14))
+        self.btn_open_excel.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_open_excel.setVisible(False)
+        self.btn_open_excel.clicked.connect(self._on_open_excel_clicked)
+        action_layout.addWidget(self.btn_open_excel)
+
+        self.btn_open_folder = QPushButton("Buka Folder Output", self.footer_card)
+        self.btn_open_folder.setIcon(get_icon("folder", size=14))
+        self.btn_open_folder.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_open_folder.setVisible(False)
+        self.btn_open_folder.clicked.connect(self._on_open_folder_clicked)
+        action_layout.addWidget(self.btn_open_folder)
+
         self.btn_export = QPushButton("Generate Dokumen Excel", self.footer_card)
         self.btn_export.setObjectName("ExportButton")
-        self.btn_export.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogApplyButton))
+        self.btn_export.setIcon(get_icon("zap", color="#FFFFFF", size=15))
         self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_export.setToolTip("Mulai validasi dan generate dokumen laporan Excel")
         action_layout.addWidget(self.btn_export)
@@ -350,10 +468,136 @@ class MainWindow(QMainWindow):
         self.btn_export.clicked.connect(self.start_export)
         self.btn_cancel_export.clicked.connect(self.cancel_export)
 
+        # Integrasi Tema
+        ThemeManager.instance().theme_changed.connect(self._on_theme_changed)
+
+    # =========================================================================
+    # Kontrol Tema (Light / Dark Mode) & Instant Filtering
+    # =========================================================================
+
+    def toggle_theme(self) -> None:
+        """Mengganti tema visual antara Light dan Dark mode."""
+        ThemeManager.instance().toggle_theme()
+        self._update_theme_toggle_icon()
+        self._update_styles_for_theme()
+
+    def _update_theme_toggle_icon(self) -> None:
+        """Memperbarui ikon tombol toggle tema."""
+        is_dark = ThemeManager.instance().is_dark
+        if is_dark:
+            self.btn_theme_toggle.setIcon(get_icon("sun", color="#FBBF24", size=16))
+            self.btn_theme_toggle.setText(" Light")
+        else:
+            self.btn_theme_toggle.setIcon(get_icon("moon", color="#64748B", size=16))
+            self.btn_theme_toggle.setText(" Dark")
+
+    def _on_theme_changed(self, theme_name: str) -> None:
+        """Reaksi saat tema berubah secara global."""
+        self._update_theme_toggle_icon()
+        self._update_styles_for_theme()
+
+    def _update_styles_for_theme(self) -> None:
+        """Menyegarkan tampilan widget turunan saat tema aplikasi berganti."""
+        if hasattr(self, "empty_state"):
+            self.empty_state.update_theme()
+        if hasattr(self, "_update_filter_button_styles"):
+            self._update_filter_button_styles()
+        for r in self.dynamic_rows:
+            if hasattr(r, "update_status"):
+                r.update_status()
+        for r in self.row_widgets:
+            if hasattr(r, "_update_status_badge"):
+                r._update_status_badge()
+
+    def _on_search_text_changed(self, text: str) -> None:
+        """Dipanggil saat pengguna mengetik kata kunci pencarian."""
+        self.apply_row_filters()
+
+    def _set_status_filter(self, filter_name: str) -> None:
+        """Mengubah status filter aktif (all, empty, filled)."""
+        self.active_status_filter = filter_name
+        self._update_filter_button_styles()
+        self.apply_row_filters()
+
+    def _update_filter_button_styles(self) -> None:
+        """Memperbarui tampilan tombol filter aktif."""
+        p = ThemeManager.instance().get_palette()
+        for btn, mode in [
+            (getattr(self, "btn_filter_all", None), "all"),
+            (getattr(self, "btn_filter_empty", None), "empty"),
+            (getattr(self, "btn_filter_filled", None), "filled"),
+        ]:
+            if not btn:
+                continue
+            if self.active_status_filter == mode:
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {p.PRIMARY};
+                        color: #FFFFFF;
+                        font-weight: 600;
+                        border: none;
+                        border-radius: 5px;
+                        padding: 4px 10px;
+                        font-size: 11px;
+                    }}
+                """)
+            else:
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {p.SURFACE_ALT};
+                        color: {p.TEXT};
+                        border: 1px solid {p.BORDER};
+                        border-radius: 5px;
+                        padding: 4px 10px;
+                        font-size: 11px;
+                    }}
+                    QPushButton:hover {{
+                        border-color: {p.PRIMARY};
+                    }}
+                """)
+
+    def apply_row_filters(self) -> None:
+        """Menyaring baris DynamicPhotoRow berdasarkan kata kunci dan status filter."""
+        search_query = self.input_search.text().strip() if hasattr(self, "input_search") else ""
+        status_filter = getattr(self, "active_status_filter", "all")
+        visible_count = 0
+        total_count = len(self.dynamic_rows)
+
+        for row in self.dynamic_rows:
+            if hasattr(row, "matches_filter"):
+                match = row.matches_filter(search_query, status_filter)
+                row.setVisible(match)
+                if match:
+                    visible_count += 1
+            else:
+                row.setVisible(True)
+                visible_count += 1
+
+        if hasattr(self, "lbl_filter_stats"):
+            if total_count > 0 and (search_query or status_filter != "all"):
+                self.lbl_filter_stats.setText(f"Menampilkan {visible_count} dari {total_count} field")
+                self.lbl_filter_stats.setVisible(True)
+            else:
+                self.lbl_filter_stats.setVisible(False)
+
+    def _on_open_excel_clicked(self) -> None:
+        """Membuka dokumen Excel hasil generate terakhir."""
+        excel_path = getattr(self, "_last_generated_excel_path", None)
+        if excel_path and os.path.isfile(excel_path):
+            reveal_in_explorer(excel_path)
+
+    def _on_open_folder_clicked(self) -> None:
+        """Membuka folder output hasil ekspor di file manager."""
+        out_dir = self.get_output_directory()
+        if not out_dir and getattr(self, "_last_generated_excel_path", None):
+            out_dir = os.path.dirname(self._last_generated_excel_path)
+        if out_dir and os.path.isdir(out_dir):
+            open_folder_in_explorer(out_dir)
 
     # =========================================================================
     # Manajemen Proyek & Dynamic Photo Workspace (Sesi 11)
     # =========================================================================
+
 
     def _update_header_info(self) -> None:
         """Memperbarui informasi site dan template aktif di header."""
@@ -459,6 +703,13 @@ class MainWindow(QMainWindow):
 
         self.rows_layout.addStretch()
         self.scroll_content.setUpdatesEnabled(True)
+
+        if hasattr(self, "filter_container"):
+            self.filter_container.setVisible(True)
+        if hasattr(self, "empty_state"):
+            self.empty_state.setVisible(len(template.fields) == 0)
+
+        self.apply_row_filters()
         self.update_summary_stats()
 
     def _on_dynamic_photo_changed(self, field_id: str, photo_path: str) -> None:
@@ -498,6 +749,11 @@ class MainWindow(QMainWindow):
         self.scroll_content.setUpdatesEnabled(False)
         self.clear_all_rows()
 
+        if hasattr(self, "filter_container"):
+            self.filter_container.setVisible(False)
+        if hasattr(self, "empty_state"):
+            self.empty_state.setVisible(count == 0)
+
         for i in range(1, count + 1):
             row = RowWidget(row_index=i, parent=self.scroll_content)
             row.data_changed.connect(self._on_row_data_changed)
@@ -509,26 +765,32 @@ class MainWindow(QMainWindow):
         self.update_summary_stats()
 
     def clear_all_rows(self) -> None:
-        """Membersihkan seluruh widget baris yang ada di layout."""
-        for row in self.row_widgets:
+        """Membersihkan seluruh widget baris yang ada di layout tanpa menghapus empty state."""
+        for row in list(self.row_widgets):
             self.rows_layout.removeWidget(row)
             row.setParent(None)
             row.deleteLater()
         self.row_widgets.clear()
 
-        for row in self.dynamic_rows:
+        for row in list(self.dynamic_rows):
             self.rows_layout.removeWidget(row)
             row.setParent(None)
             row.deleteLater()
         self.dynamic_rows.clear()
 
-        # Bersihkan item stretch yang tersisa di layout
-        while self.rows_layout.count() > 0:
-            item = self.rows_layout.takeAt(0)
-            widget = item.widget()
+        # Bersihkan item selain empty_state
+        idx = self.rows_layout.count() - 1
+        while idx >= 0:
+            item = self.rows_layout.itemAt(idx)
+            widget = item.widget() if item else None
+            if widget and widget is getattr(self, "empty_state", None):
+                idx -= 1
+                continue
+            item = self.rows_layout.takeAt(idx)
             if widget:
                 widget.setParent(None)
                 widget.deleteLater()
+            idx -= 1
 
     def add_row(
         self,
@@ -733,7 +995,7 @@ class MainWindow(QMainWindow):
         self.update_summary_stats()
 
     def update_summary_stats(self) -> None:
-        """Menghitung dan menampilkan statistik baris saat ini."""
+        """Menghitung dan menampilkan statistik baris saat ini serta bilah kesiapan dokumen."""
         if self.dynamic_rows:
             total = len(self.dynamic_rows)
             photo_rows = [r for r in self.dynamic_rows if getattr(r, "field_type", "photo") == "photo"]
@@ -742,9 +1004,11 @@ class MainWindow(QMainWindow):
             if not text_rows:
                 with_photos = len([r for r in photo_rows if r.get_photo()])
                 self.lbl_stats.setText(f"Total: {total} field | Foto Terisi: {with_photos} / {total}")
+                pct = int(100 * with_photos / total) if total > 0 else 0
             elif not photo_rows:
                 with_texts = len([r for r in text_rows if r.get_text()])
                 self.lbl_stats.setText(f"Total: {total} field | Teks Terisi: {with_texts} / {total}")
+                pct = int(100 * with_texts / total) if total > 0 else 0
             else:
                 photo_filled = len([r for r in photo_rows if r.get_photo()])
                 text_filled = len([r for r in text_rows if r.get_text()])
@@ -753,7 +1017,16 @@ class MainWindow(QMainWindow):
                     f"Total: {total} field | Terisi: {total_filled} / {total} "
                     f"(Foto: {photo_filled}/{len(photo_rows)}, Teks: {text_filled}/{len(text_rows)})"
                 )
+                pct = int(100 * total_filled / total) if total > 0 else 0
+
+            if hasattr(self, "readiness_bar"):
+                self.readiness_bar.setValue(pct)
+                self.readiness_bar.setToolTip(f"Kesiapan Dokumen: {pct}% Terisi")
+                self.readiness_bar.setVisible(True)
             return
+
+        if hasattr(self, "readiness_bar"):
+            self.readiness_bar.setVisible(False)
 
         total = len(self.row_widgets)
         with_photos = 0
@@ -956,6 +1229,13 @@ class MainWindow(QMainWindow):
             f"font-size: 11px; font-weight: 600; color: {color};"
         )
         self.update_summary_stats()
+
+        if output_path and os.path.isfile(output_path):
+            self._last_generated_excel_path = output_path
+            if hasattr(self, "btn_open_excel"):
+                self.btn_open_excel.setVisible(True)
+            if hasattr(self, "btn_open_folder"):
+                self.btn_open_folder.setVisible(True)
 
         dialog = ReportDialog(
             success_count=success_count,

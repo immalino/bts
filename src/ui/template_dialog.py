@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
 from src.config import APP_ICON_PNG, ThemeColors
 from src.core.models import PhotoFieldConfig, TemplateConfig
 from src.core.storage import StorageManager
+from src.ui.icons import get_icon, render_svg_pixmap
 from src.utils.excel_utils import get_sheet_names_from_excel, is_valid_cell_coordinate
 
 
@@ -295,14 +296,14 @@ class FieldEditDialog(QDialog):
         footer_layout.addStretch(1)
 
         self.btn_cancel = QPushButton("Batal", self)
-        self.btn_cancel.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCancelButton))
+        self.btn_cancel.setIcon(get_icon("x", size=14))
         self.btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_cancel.clicked.connect(self.reject)
         footer_layout.addWidget(self.btn_cancel)
 
         self.btn_save = QPushButton("Simpan", self)
         self.btn_save.setObjectName("PrimaryButton")
-        self.btn_save.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton))
+        self.btn_save.setIcon(get_icon("check", color="#FFFFFF", size=14))
         self.btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_save.setDefault(True)
         self.btn_save.clicked.connect(self._on_save_clicked)
@@ -553,7 +554,7 @@ class TemplateEditorDialog(QDialog):
         file_browse_layout.addWidget(self.edit_file_path, stretch=1)
 
         self.btn_browse = QPushButton("Pilih File .xlsx", meta_card)
-        self.btn_browse.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton))
+        self.btn_browse.setIcon(get_icon("folder", size=14))
         self.btn_browse.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_browse.clicked.connect(self._on_browse_file_clicked)
         file_browse_layout.addWidget(self.btn_browse)
@@ -583,20 +584,20 @@ class TemplateEditorDialog(QDialog):
 
         # Toolbar Tombol Field
         self.btn_add_field = QPushButton("Tambah Field", self)
-        self.btn_add_field.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogNewFolder))
+        self.btn_add_field.setIcon(get_icon("plus", color="#FFFFFF", size=14))
         self.btn_add_field.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_add_field.clicked.connect(self._on_add_field_clicked)
         fields_header_layout.addWidget(self.btn_add_field)
 
         self.btn_edit_field = QPushButton("Edit Field", self)
-        self.btn_edit_field.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        self.btn_edit_field.setIcon(get_icon("file_text", size=14))
         self.btn_edit_field.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_edit_field.setEnabled(False)
         self.btn_edit_field.clicked.connect(self._on_edit_field_clicked)
         fields_header_layout.addWidget(self.btn_edit_field)
 
         self.btn_delete_field = QPushButton("Hapus Field", self)
-        self.btn_delete_field.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
+        self.btn_delete_field.setIcon(get_icon("trash", size=14))
         self.btn_delete_field.setObjectName("DangerButton")
         self.btn_delete_field.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_delete_field.setEnabled(False)
@@ -604,14 +605,14 @@ class TemplateEditorDialog(QDialog):
         fields_header_layout.addWidget(self.btn_delete_field)
 
         self.btn_move_up = QPushButton("Naik", self)
-        self.btn_move_up.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp))
+        self.btn_move_up.setIcon(get_icon("arrow_up", size=14))
         self.btn_move_up.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_move_up.setEnabled(False)
         self.btn_move_up.clicked.connect(self._on_move_up_clicked)
         fields_header_layout.addWidget(self.btn_move_up)
 
         self.btn_move_down = QPushButton("Turun", self)
-        self.btn_move_down.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown))
+        self.btn_move_down.setIcon(get_icon("arrow_down", size=14))
         self.btn_move_down.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_move_down.setEnabled(False)
         self.btn_move_down.clicked.connect(self._on_move_down_clicked)
@@ -657,14 +658,14 @@ class TemplateEditorDialog(QDialog):
         footer_layout.addStretch(1)
 
         self.btn_cancel = QPushButton("Batal", self)
-        self.btn_cancel.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCancelButton))
+        self.btn_cancel.setIcon(get_icon("x", size=16))
         self.btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_cancel.clicked.connect(self.reject)
         footer_layout.addWidget(self.btn_cancel)
 
         self.btn_save = QPushButton("Simpan Template", self)
         self.btn_save.setObjectName("PrimaryButton")
-        self.btn_save.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton))
+        self.btn_save.setIcon(get_icon("check", color="#ffffff", size=16))
         self.btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_save.setDefault(True)
         self.btn_save.clicked.connect(self._on_save_template_clicked)
@@ -1056,13 +1057,13 @@ class TemplateManagerDialog(QDialog):
 
         self.btn_new = QPushButton("Buat Template Baru", self)
         self.btn_new.setObjectName("PrimaryButton")
-        self.btn_new.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogNewFolder))
+        self.btn_new.setIcon(get_icon("plus", color="#ffffff", size=16))
         self.btn_new.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_new.clicked.connect(self._on_new_template_clicked)
         toolbar_layout.addWidget(self.btn_new)
 
         self.btn_edit = QPushButton("Edit Template", self)
-        self.btn_edit.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        self.btn_edit.setIcon(get_icon("file_spreadsheet", size=16))
         self.btn_edit.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_edit.setEnabled(False)
         self.btn_edit.clicked.connect(self._on_edit_template_clicked)
@@ -1070,7 +1071,7 @@ class TemplateManagerDialog(QDialog):
 
         self.btn_delete = QPushButton("Hapus Template", self)
         self.btn_delete.setObjectName("DangerButton")
-        self.btn_delete.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
+        self.btn_delete.setIcon(get_icon("trash", color="#ef4444", size=16))
         self.btn_delete.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_delete.setEnabled(False)
         self.btn_delete.clicked.connect(self._on_delete_template_clicked)
@@ -1109,7 +1110,7 @@ class TemplateManagerDialog(QDialog):
 
         self.btn_select = QPushButton("Pilih Template Aktif", self)
         self.btn_select.setObjectName("PrimaryButton")
-        self.btn_select.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogApplyButton))
+        self.btn_select.setIcon(get_icon("check", color="#ffffff", size=16))
         self.btn_select.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_select.setEnabled(False)
         self.btn_select.clicked.connect(self._on_select_template_clicked)
@@ -1118,7 +1119,7 @@ class TemplateManagerDialog(QDialog):
         footer_layout.addStretch(1)
 
         self.btn_close = QPushButton("Tutup", self)
-        self.btn_close.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCloseButton))
+        self.btn_close.setIcon(get_icon("x", size=16))
         self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_close.clicked.connect(self.reject)
         footer_layout.addWidget(self.btn_close)

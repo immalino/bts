@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.config import ThemeColors
+from src.ui.icons import get_icon
 from src.utils.file_utils import open_folder_in_explorer
 
 
@@ -229,14 +230,14 @@ class ReportDialog(QDialog):
         if self.excel_path and os.path.isfile(self.excel_path):
             self.btn_open_excel = QPushButton("Buka Dokumen Excel", self)
             self.btn_open_excel.setObjectName("PrimaryButton")
-            self.btn_open_excel.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+            self.btn_open_excel.setIcon(get_icon("file_spreadsheet", color="#ffffff", size=16))
             self.btn_open_excel.setCursor(Qt.CursorShape.PointingHandCursor)
             self.btn_open_excel.clicked.connect(self._on_open_excel_clicked)
             footer_layout.addWidget(self.btn_open_excel)
 
         # Tombol Buka Folder Output
         self.btn_open_folder = QPushButton("Buka Folder Output", self)
-        self.btn_open_folder.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton))
+        self.btn_open_folder.setIcon(get_icon("folder", size=16))
         self.btn_open_folder.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_open_folder.clicked.connect(self._on_open_folder_clicked)
         footer_layout.addWidget(self.btn_open_folder)
@@ -244,7 +245,7 @@ class ReportDialog(QDialog):
         footer_layout.addStretch(1)
 
         self.btn_close = QPushButton("Tutup", self)
-        self.btn_close.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCloseButton))
+        self.btn_close.setIcon(get_icon("x", size=16))
         self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_close.setDefault(True)
         self.btn_close.clicked.connect(self.accept)

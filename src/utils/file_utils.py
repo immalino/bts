@@ -72,3 +72,29 @@ def open_folder_in_explorer(folder_path: str) -> bool:
     except Exception:
         return False
 
+
+def reveal_in_explorer(file_path: str) -> bool:
+    """
+    Membuka file manager dan menyorot berkas tertentu (Windows / macOS / Linux).
+    """
+    import subprocess
+    import sys
+
+    if not file_path or not os.path.exists(file_path):
+        return False
+
+    abs_path = os.path.abspath(file_path)
+    try:
+        if sys.platform == "win32":
+            subprocess.Popen(["explorer", "/select,", abs_path])
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", "-R", abs_path])
+        else:
+            parent_dir = os.path.dirname(abs_path)
+            subprocess.Popen(["xdg-open", parent_dir])
+        return True
+    except Exception:
+        return False
+
+
+

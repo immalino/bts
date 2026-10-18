@@ -25,6 +25,9 @@ from src.config import SUPPORTED_EXTENSIONS, THUMBNAIL_SIZE, ThemeColors
 from src.core.image_loader import create_thumbnail
 from src.core.models import PhotoFieldConfig
 from src.ui.drop_zone import DropZoneWidget
+from src.ui.icons import get_icon
+from src.ui.lightbox import PhotoLightboxDialog
+from src.ui.styles import ThemeManager
 
 
 class DynamicRowStatus:
@@ -150,7 +153,7 @@ class DynamicPhotoRow(QFrame):
         btn_layout.setSpacing(6)
 
         self.btn_select = QPushButton("Pilih", self)
-        self.btn_select.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton))
+        self.btn_select.setIcon(get_icon("folder", color="#FFFFFF", size=14))
         self.btn_select.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_select.setStyleSheet(f"""
             QPushButton {{
@@ -169,7 +172,7 @@ class DynamicPhotoRow(QFrame):
         btn_layout.addWidget(self.btn_select)
 
         self.btn_clear = QPushButton("Hapus", self)
-        self.btn_clear.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
+        self.btn_clear.setIcon(get_icon("trash", size=14))
         self.btn_clear.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_clear.setStyleSheet(f"""
             QPushButton {{
@@ -197,10 +200,11 @@ class DynamicPhotoRow(QFrame):
         self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(self.lbl_status)
 
+        p = ThemeManager.instance().get_palette()
         self.setStyleSheet(f"""
             QFrame#DynamicPhotoRow {{
-                background-color: {ThemeColors.SURFACE};
-                border-bottom: 1px solid {ThemeColors.BORDER};
+                background-color: {p.SURFACE};
+                border-bottom: 1px solid {p.BORDER};
             }}
         """)
 
@@ -208,6 +212,23 @@ class DynamicPhotoRow(QFrame):
         self.drop_zone.file_dropped.connect(self.set_photo)
         self.btn_select.clicked.connect(self._on_choose_photo_clicked)
         self.btn_clear.clicked.connect(self.clear_photo)
+
+        # Klik pada thumbnail membuka Lightbox Modal
+        orig_thumb_press = self.lbl_thumbnail.mousePressEvent
+
+        def on_thumb_click(event):
+            if event.button() == Qt.MouseButton.LeftButton and self.photo_path and os.path.isfile(self.photo_path):
+                dlg = PhotoLightboxDialog(
+                    photo_path=self.photo_path,
+                    title=self.field_config.label,
+                    subtitle=f"Sheet: {self.field_config.sheet_name}  |  Sel: {self.field_config.cell_anchor}",
+                    parent=self,
+                )
+                dlg.exec()
+            else:
+                orig_thumb_press(event)
+
+        self.lbl_thumbnail.mousePressEvent = on_thumb_click
 
         # Mengizinkan klik pada DropZone untuk memilih file
         orig_mouse_press = self.drop_zone.mousePressEvent
@@ -279,31 +300,56 @@ class DynamicPhotoRow(QFrame):
             self.data_changed.emit()
 
     def update_status(self) -> None:
-        """Memperbarui teks dan warna badge status (Kosong / Terisi)."""
+        """Memperbarui teks dan warna badge status (Kosong / Terisi) sesuai tema aktif."""
+        p = ThemeManager.instance().get_palette()
         if self.photo_path and os.path.isfile(self.photo_path):
             self.lbl_status.setText(DynamicRowStatus.FILLED)
-            self.lbl_status.setStyleSheet("""
-                QLabel {
-                    background-color: #DCFCE7;
-                    color: #166534;
+            self.lbl_status.setStyleSheet(f"""
+                QLabel {{
+                    background-color: {p.SUCCESS_BG};
+                    color: {p.SUCCESS_TEXT};
                     font-size: 11px;
                     font-weight: 700;
                     border-radius: 4px;
-                    border: 1px solid #BBF7D0;
-                }
+                    border: 1px solid {p.SUCCESS_BORDER};
+                }}
             """)
+            self.lbl_thumbnail.setToolTip("Klik untuk melihat foto resolusi penuh")
+            self.lbl_thumbnail.setCursor(Qt.CursorShape.PointingHandCursor)
         else:
             self.lbl_status.setText(DynamicRowStatus.EMPTY)
             self.lbl_status.setStyleSheet(f"""
                 QLabel {{
-                    background-color: #F1F5F9;
-                    color: {ThemeColors.TEXT_MUTED};
+                    background-color: {p.SURFACE_ALT};
+                    color: {p.TEXT_MUTED};
                     font-size: 11px;
                     font-weight: 600;
                     border-radius: 4px;
-                    border: 1px solid {ThemeColors.BORDER};
+                    border: 1px solid {p.BORDER};
                 }}
             """)
+            self.lbl_thumbnail.setToolTip("")
+            self.lbl_thumbnail.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def matches_filter(self, search_text: str = "", status_filter: str = "all") -> bool:
+        """
+        Memeriksa apakah baris ini memenuhi kriteria pencarian dan filter status.
+        """
+        has_photo = bool(self.photo_path and os.path.isfile(self.photo_path))
+        if status_filter == "filled" and not has_photo:
+            return False
+        if status_filter == "empty" and has_photo:
+            return False
+
+        if search_text:
+            query = search_text.lower().strip()
+            label_match = query in self.field_config.label.lower()
+            sheet_match = query in self.field_config.sheet_name.lower()
+            cell_match = query in self.field_config.cell_anchor.lower()
+            if not (label_match or sheet_match or cell_match):
+                return False
+
+        return True
 
     def get_photo(self) -> Optional[str]:
         """Mengambil path foto sumber yang terpasang."""
@@ -445,7 +491,7 @@ class DynamicTextRow(QFrame):
 
         # 5. Tombol Hapus / Kosongkan
         self.btn_clear = QPushButton("Hapus", self)
-        self.btn_clear.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
+        self.btn_clear.setIcon(get_icon("trash", size=14))
         self.btn_clear.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_clear.setStyleSheet(f"""
             QPushButton {{
@@ -472,10 +518,11 @@ class DynamicTextRow(QFrame):
         self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(self.lbl_status)
 
+        p = ThemeManager.instance().get_palette()
         self.setStyleSheet(f"""
             QFrame#DynamicTextRow {{
-                background-color: {ThemeColors.SURFACE};
-                border-bottom: 1px solid {ThemeColors.BORDER};
+                background-color: {p.SURFACE};
+                border-bottom: 1px solid {p.BORDER};
             }}
         """)
 
@@ -517,32 +564,54 @@ class DynamicTextRow(QFrame):
         return None
 
     def update_status(self) -> None:
-        """Memperbarui teks dan warna badge status (Kosong / Terisi)."""
+        """Memperbarui teks dan warna badge status (Kosong / Terisi) sesuai tema aktif."""
+        p = ThemeManager.instance().get_palette()
         val = self.edit_text.text().strip()
         if val:
             self.lbl_status.setText(DynamicRowStatus.FILLED)
-            self.lbl_status.setStyleSheet("""
-                QLabel {
-                    background-color: #DCFCE7;
-                    color: #166534;
+            self.lbl_status.setStyleSheet(f"""
+                QLabel {{
+                    background-color: {p.SUCCESS_BG};
+                    color: {p.SUCCESS_TEXT};
                     font-size: 11px;
                     font-weight: 700;
                     border-radius: 4px;
-                    border: 1px solid #BBF7D0;
-                }
+                    border: 1px solid {p.SUCCESS_BORDER};
+                }}
             """)
         else:
             self.lbl_status.setText(DynamicRowStatus.EMPTY)
             self.lbl_status.setStyleSheet(f"""
                 QLabel {{
-                    background-color: #F1F5F9;
-                    color: {ThemeColors.TEXT_MUTED};
+                    background-color: {p.SURFACE_ALT};
+                    color: {p.TEXT_MUTED};
                     font-size: 11px;
                     font-weight: 600;
                     border-radius: 4px;
-                    border: 1px solid {ThemeColors.BORDER};
+                    border: 1px solid {p.BORDER};
                 }}
             """)
+
+    def matches_filter(self, search_text: str = "", status_filter: str = "all") -> bool:
+        """
+        Memeriksa apakah baris teks ini memenuhi kriteria pencarian dan filter status.
+        """
+        has_text = bool(self.get_text().strip())
+        if status_filter == "filled" and not has_text:
+            return False
+        if status_filter == "empty" and has_text:
+            return False
+
+        if search_text:
+            query = search_text.lower().strip()
+            label_match = query in self.field_config.label.lower()
+            sheet_match = query in self.field_config.sheet_name.lower()
+            cell_match = query in self.field_config.cell_anchor.lower()
+            if not (label_match or sheet_match or cell_match):
+                return False
+
+        return True
+
 
     def get_field_id(self) -> str:
         """Mengambil ID field teks."""

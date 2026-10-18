@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
 from src.config import APP_ICON_PNG, ThemeColors
 from src.core.models import ProjectData, TemplateConfig
 from src.core.storage import StorageManager
+from src.ui.icons import get_icon, render_svg_pixmap
 from src.ui.template_dialog import TemplateManagerDialog
 
 
@@ -139,7 +140,7 @@ class NewProjectDialog(QDialog):
         tpl_choice_layout.addWidget(self.combo_template, stretch=1)
 
         self.btn_manage_tpl = QPushButton("Kelola Template", form_group)
-        self.btn_manage_tpl.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        self.btn_manage_tpl.setIcon(get_icon("file_spreadsheet", size=16))
         self.btn_manage_tpl.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_manage_tpl.clicked.connect(self._on_manage_templates_clicked)
         tpl_choice_layout.addWidget(self.btn_manage_tpl)
@@ -155,14 +156,14 @@ class NewProjectDialog(QDialog):
         footer_layout.addStretch(1)
 
         self.btn_cancel = QPushButton("Batal", self)
-        self.btn_cancel.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCancelButton))
+        self.btn_cancel.setIcon(get_icon("x", size=14))
         self.btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_cancel.clicked.connect(self.reject)
         footer_layout.addWidget(self.btn_cancel)
 
         self.btn_create = QPushButton("Buat Proyek", self)
         self.btn_create.setObjectName("PrimaryButton")
-        self.btn_create.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOkButton))
+        self.btn_create.setIcon(get_icon("plus", color="#FFFFFF", size=14))
         self.btn_create.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_create.setDefault(True)
         self.btn_create.clicked.connect(self._on_create_clicked)
@@ -305,20 +306,32 @@ class ProjectManagerDialog(QDialog):
 
         self.btn_new = QPushButton("Proyek Site Baru", self)
         self.btn_new.setObjectName("PrimaryButton")
-        self.btn_new.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogNewFolder))
+        self.btn_new.setIcon(get_icon("plus", color="#FFFFFF", size=14))
         self.btn_new.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_new.clicked.connect(self._on_new_project_clicked)
         toolbar_layout.addWidget(self.btn_new)
 
         self.btn_delete = QPushButton("Hapus Site", self)
         self.btn_delete.setObjectName("DangerButton")
-        self.btn_delete.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
+        self.btn_delete.setIcon(get_icon("trash", size=14))
         self.btn_delete.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_delete.setEnabled(False)
         self.btn_delete.clicked.connect(self._on_delete_project_clicked)
         toolbar_layout.addWidget(self.btn_delete)
 
         toolbar_layout.addStretch(1)
+
+        # Search Bar
+        lbl_search = QLabel(self)
+        lbl_search.setPixmap(render_svg_pixmap("search", size=14))
+        toolbar_layout.addWidget(lbl_search)
+
+        self.input_search = QLineEdit(self)
+        self.input_search.setPlaceholderText("Cari nama atau ID site...")
+        self.input_search.setFixedWidth(220)
+        self.input_search.textChanged.connect(self._on_search_changed)
+        toolbar_layout.addWidget(self.input_search)
+
         layout.addLayout(toolbar_layout)
 
         # 3. Table Projects
@@ -351,7 +364,7 @@ class ProjectManagerDialog(QDialog):
 
         self.btn_open = QPushButton("Buka Site", self)
         self.btn_open.setObjectName("PrimaryButton")
-        self.btn_open.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton))
+        self.btn_open.setIcon(get_icon("folder", color="#FFFFFF", size=14))
         self.btn_open.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_open.setEnabled(False)
         self.btn_open.clicked.connect(self._on_open_project_clicked)
@@ -360,7 +373,7 @@ class ProjectManagerDialog(QDialog):
         footer_layout.addStretch(1)
 
         self.btn_close = QPushButton("Tutup", self)
-        self.btn_close.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCloseButton))
+        self.btn_close.setIcon(get_icon("x", size=14))
         self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_close.clicked.connect(self.reject)
         footer_layout.addWidget(self.btn_close)
@@ -406,6 +419,17 @@ class ProjectManagerDialog(QDialog):
         has_sel = len(selected_rows) > 0
         self.btn_open.setEnabled(has_sel)
         self.btn_delete.setEnabled(has_sel)
+
+    def _on_search_changed(self, text: str) -> None:
+        """Menyaring baris tabel site berdasarkan query pencarian."""
+        query = text.strip().lower()
+        for row in range(self.table_projects.rowCount()):
+            item_site = self.table_projects.item(row, 0)
+            item_tpl = self.table_projects.item(row, 1)
+            site_text = item_site.text().lower() if item_site else ""
+            tpl_text = item_tpl.text().lower() if item_tpl else ""
+            match = (query in site_text) or (query in tpl_text)
+            self.table_projects.setRowHidden(row, not match)
 
     def _get_selected_project(self) -> Optional[ProjectData]:
         selected_rows = self.table_projects.selectionModel().selectedRows()

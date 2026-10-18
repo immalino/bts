@@ -50,21 +50,24 @@ class DropZoneWidget(QFrame):
         self.layout.addWidget(self.label_sub)
 
     def _apply_style(self) -> None:
-        """Memperbarui stylesheet berdasarkan state hover atau ada file."""
+        """Memperbarui stylesheet berdasarkan state hover atau ada file sesuai tema aktif."""
+        from src.ui.styles import ThemeManager
+        p = ThemeManager.instance().get_palette()
+
         if self._is_hovered:
-            border_color = ThemeColors.PRIMARY
-            bg_color = "#EFF6FF"  # Biru sangat muda / light highlight
-            text_color = ThemeColors.PRIMARY
+            border_color = p.PRIMARY
+            bg_color = p.PRIMARY_LIGHT
+            text_color = p.PRIMARY
             border_style = "2px dashed"
         elif self._has_file:
-            border_color = ThemeColors.SUCCESS
-            bg_color = "#F0FDF4"  # Hijau sangat muda
-            text_color = ThemeColors.TEXT
+            border_color = p.SUCCESS
+            bg_color = p.SUCCESS_BG
+            text_color = p.SUCCESS_TEXT
             border_style = "1px solid"
         else:
-            border_color = ThemeColors.BORDER
-            bg_color = ThemeColors.SURFACE
-            text_color = ThemeColors.TEXT_MUTED
+            border_color = p.BORDER
+            bg_color = p.SURFACE
+            text_color = p.TEXT_MUTED
             border_style = "1.5px dashed"
 
         self.setStyleSheet(f"""
@@ -79,7 +82,7 @@ class DropZoneWidget(QFrame):
             }}
         """)
         self.label_main.setStyleSheet(f"font-size: 11px; font-weight: 500; color: {text_color};")
-        self.label_sub.setStyleSheet(f"font-size: 10px; color: {ThemeColors.TEXT_MUTED};")
+        self.label_sub.setStyleSheet(f"font-size: 10px; color: {p.TEXT_MUTED};")
 
     def set_file_info(self, file_path: Optional[str]) -> None:
         """Menyetel tampilan teks ketika file foto telah dipilih/dikosongkan."""

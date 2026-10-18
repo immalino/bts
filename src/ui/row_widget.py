@@ -21,6 +21,9 @@ from src.config import SUPPORTED_EXTENSIONS, THUMBNAIL_SIZE, ThemeColors
 from src.core.image_loader import create_thumbnail
 from src.core.validator import validate_single_filename
 from src.ui.drop_zone import DropZoneWidget
+from src.ui.icons import get_icon
+from src.ui.lightbox import PhotoLightboxDialog
+from src.ui.styles import ThemeManager
 from src.utils.file_utils import split_filename_and_ext
 
 
@@ -138,6 +141,7 @@ class RowWidget(QFrame):
         btn_layout.setSpacing(6)
 
         self.btn_select = QPushButton("Pilih Foto", self)
+        self.btn_select.setIcon(get_icon("folder", color="#FFFFFF", size=14))
         self.btn_select.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_select.setStyleSheet(f"""
             QPushButton {{
@@ -156,6 +160,7 @@ class RowWidget(QFrame):
         btn_layout.addWidget(self.btn_select)
 
         self.btn_clear = QPushButton("Hapus Foto", self)
+        self.btn_clear.setIcon(get_icon("trash", size=14))
         self.btn_clear.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_clear.setStyleSheet(f"""
             QPushButton {{
@@ -182,10 +187,11 @@ class RowWidget(QFrame):
         self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(self.lbl_status)
 
+        p = ThemeManager.instance().get_palette()
         self.setStyleSheet(f"""
             QFrame#RowWidget {{
-                background-color: {ThemeColors.SURFACE};
-                border-bottom: 1px solid {ThemeColors.BORDER};
+                background-color: {p.SURFACE};
+                border-bottom: 1px solid {p.BORDER};
             }}
         """)
 
@@ -194,6 +200,23 @@ class RowWidget(QFrame):
         self.btn_select.clicked.connect(self._on_choose_photo_clicked)
         self.btn_clear.clicked.connect(self.clear_photo)
         self.input_name.textChanged.connect(self._on_target_name_changed)
+
+        # Klik pada thumbnail membuka Lightbox Modal
+        orig_thumb_press = self.lbl_thumbnail.mousePressEvent
+
+        def on_thumb_click(event):
+            if event.button() == Qt.MouseButton.LeftButton and self.source_photo and os.path.isfile(self.source_photo):
+                dlg = PhotoLightboxDialog(
+                    photo_path=self.source_photo,
+                    title=f"Baris #{self.row_index:02d}",
+                    subtitle=os.path.basename(self.source_photo),
+                    parent=self,
+                )
+                dlg.exec()
+            else:
+                orig_thumb_press(event)
+
+        self.lbl_thumbnail.mousePressEvent = on_thumb_click
 
     def set_row_index(self, index: int) -> None:
         """Memperbarui nomor urut baris."""
@@ -318,25 +341,26 @@ class RowWidget(QFrame):
         self._update_status_badge()
 
     def _update_status_badge(self) -> None:
-        """Memperbarui tampilan visual badge status dan border baris."""
+        """Memperbarui tampilan visual badge status dan border baris sesuai tema aktif."""
+        p = ThemeManager.instance().get_palette()
         text = self._status
         tooltip = self._status_message
 
         if self._status == RowStatus.READY:
-            bg_color = "#DCFCE7"  # Hijau lembut
-            text_color = "#166534"
-            border_left = "4px solid #16A34A"
+            bg_color = p.SUCCESS_BG
+            text_color = p.SUCCESS_TEXT
+            border_left = f"4px solid {p.SUCCESS}"
         elif self._status == RowStatus.SUCCESS:
-            bg_color = "#D1FAE5"  # Hijau sukses terang
-            text_color = "#065F46"
-            border_left = "4px solid #10B981"
+            bg_color = p.SUCCESS_BG
+            text_color = p.SUCCESS_TEXT
+            border_left = f"4px solid {p.SUCCESS}"
         elif self._status == RowStatus.ERROR:
-            bg_color = "#FEE2E2"  # Merah lembut
-            text_color = "#991B1B"
-            border_left = "4px solid #EF4444"
+            bg_color = p.DANGER_BG
+            text_color = p.DANGER_TEXT
+            border_left = f"4px solid {p.DANGER}"
         else:  # EMPTY / default
-            bg_color = "#F1F5F9"  # Abu-abu lembut
-            text_color = ThemeColors.TEXT_MUTED
+            bg_color = p.SURFACE_ALT
+            text_color = p.TEXT_MUTED
             border_left = "4px solid transparent"
 
         self.lbl_status.setText(text)
@@ -352,8 +376,8 @@ class RowWidget(QFrame):
         """)
         self.setStyleSheet(f"""
             QFrame#RowWidget {{
-                background-color: {ThemeColors.SURFACE};
-                border-bottom: 1px solid {ThemeColors.BORDER};
+                background-color: {p.SURFACE};
+                border-bottom: 1px solid {p.BORDER};
                 border-left: {border_left};
             }}
         """)

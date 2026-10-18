@@ -25,6 +25,26 @@ def _ensure_gui_app() -> Optional[QApplication]:
     return app
 
 
+def load_image_with_exif(image_path: str) -> Optional[Image.Image]:
+    """
+    Membuka file gambar dengan PIL dan mengoreksi orientasi EXIF kamera secara otomatis.
+    """
+    if not image_path or not os.path.exists(image_path) or not os.path.isfile(image_path):
+        return None
+    try:
+        img = Image.open(image_path)
+        try:
+            img = ImageOps.exif_transpose(img)
+        except Exception:
+            pass
+
+        if img.mode not in ("RGB", "RGBA"):
+            img = img.convert("RGBA")
+        return img
+    except Exception:
+        return None
+
+
 def create_thumbnail(
     image_path: str,
     size: Tuple[int, int] = THUMBNAIL_SIZE
@@ -37,29 +57,19 @@ def create_thumbnail(
     - Memanfaatkan Image.thumbnail() untuk downsampling efisien tanpa memuat ukuran penuh ke RAM secara persisten.
     - Menangani fallback jika file gambar corrupt, tidak ditemukan, atau format tidak didukung (mengembalikan None).
     """
-    if not image_path or not os.path.exists(image_path) or not os.path.isfile(image_path):
+    img = load_image_with_exif(image_path)
+    if img is None:
         return None
 
     try:
-        with Image.open(image_path) as img:
-            # Koreksi rotasi berdasarkan metadata orientasi EXIF kamera
-            try:
-                img = ImageOps.exif_transpose(img)
-            except Exception:
-                # Jika metadata EXIF rusak atau tidak bisa dibaca, lanjutkan dengan gambar asli
-                pass
+        # Ubah ukuran secara proporsional dengan resampling lanczos berkualitas tinggi
+        img.thumbnail(size, Image.Resampling.LANCZOS)
 
-            # Konversi jika format palet/warna tidak langsung didukung PNG (misal CMYK)
-            if img.mode not in ("RGB", "RGBA"):
-                img = img.convert("RGBA")
-
-            # Ubah ukuran secara proporsional dengan resampling lanczos berkualitas tinggi
-            img.thumbnail(size, Image.Resampling.LANCZOS)
-
-            # Simpan hasil thumbnail ke buffer in-memory
-            buffer = io.BytesIO()
-            img.save(buffer, format="PNG")
-            buffer_bytes = buffer.getvalue()
+        # Simpan hasil thumbnail ke buffer in-memory
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        buffer_bytes = buffer.getvalue()
+        img.close()
 
         _ensure_gui_app()
 
