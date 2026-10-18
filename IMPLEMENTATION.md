@@ -318,12 +318,12 @@ Membuat komponen penyusun 1 baris foto (`RowWidget`) yang interaktif, memiliki a
 - `tests/demo_row.py` (script uji visual)
 
 #### 📋 Checklist Tugas Sesi 4
-- [ ] Buat `src/ui/drop_zone.py`:
+- [x] Buat `src/ui/drop_zone.py`:
   - `DropZoneWidget(QFrame)` dengan garis putus-putus (*dashed border*).
   - Menangani hover visual saat file diseret ke atasnya (perubahan border color).
   - Memfilter hanya 1 file dan berekstensi gambar valid (`.jpg`, `.png`, dll).
   - Signal `file_dropped(file_path: str)`.
-- [ ] Buat `src/ui/row_widget.py`:
+- [x] Buat `src/ui/row_widget.py`:
   - Label nomor urut (1, 2, 3, ...).
   - Label Thumbnail (ukuran konsisten 64x64 px).
   - DropZoneWidget atau nama file asli.
@@ -334,7 +334,7 @@ Membuat komponen penyusun 1 baris foto (`RowWidget`) yang interaktif, memiliki a
   - Badge / Label indikator status baris (Kosong / Siap / Error / Sukses).
   - Method `get_data() -> dict` dan `set_data(...)`.
   - Signal internal ketika data foto atau teks berubah.
-- [ ] Buat file demo kecil `tests/demo_row.py` untuk menguji interaksi 1 baris secara visual.
+- [x] Buat file demo kecil `tests/demo_row.py` untuk menguji interaksi 1 baris secara visual.
 
 #### 🧪 Cara Verifikasi Sesi 4
 Jalankan demo baris di terminal:
