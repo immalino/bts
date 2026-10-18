@@ -20,6 +20,7 @@ class PhotoFieldConfig:
     custom_width: int = 0
     custom_height: int = 0
     padding: int = 2
+    alignment: str = "center"  # "center" | "top-left"
 
     def to_dict(self) -> Dict[str, Any]:
         """Konversi model konfigurasi field foto ke dictionary."""
@@ -32,6 +33,7 @@ class PhotoFieldConfig:
             "custom_width": self.custom_width,
             "custom_height": self.custom_height,
             "padding": self.padding,
+            "alignment": self.alignment,
         }
 
     @classmethod
@@ -46,6 +48,7 @@ class PhotoFieldConfig:
             custom_width=int(data.get("custom_width", 0)),
             custom_height=int(data.get("custom_height", 0)),
             padding=int(data.get("padding", 2)),
+            alignment=str(data.get("alignment", "center")),
         )
 
 

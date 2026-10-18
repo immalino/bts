@@ -70,8 +70,8 @@ class FieldEditDialog(QDialog):
     def _init_ui(self) -> None:
         title = "Edit Field Foto" if self.field_config else "Tambah Field Foto Baru"
         self.setWindowTitle(title)
-        self.resize(460, 420)
-        self.setMinimumSize(400, 360)
+        self.resize(480, 470)
+        self.setMinimumSize(420, 420)
         self.setModal(True)
 
         if APP_ICON_PNG.is_file():
@@ -219,6 +219,26 @@ class FieldEditDialog(QDialog):
         custom_size_layout.addLayout(padding_layout)
 
         form_layout.addLayout(custom_size_layout)
+
+        # 4. Perataan Posisi (Alignment)
+        lbl_align = QLabel("Perataan Posisi Foto:", form_group)
+        lbl_align.setStyleSheet(f"font-weight: 600; color: {ThemeColors.TEXT}; font-size: 12px; margin-top: 4px;")
+        form_layout.addWidget(lbl_align)
+
+        self.btn_group_align = QButtonGroup(self)
+        self.radio_align_center = QRadioButton("Tengah / Center (Rekomendasi)", form_group)
+        self.radio_align_center.setChecked(True)
+        self.radio_align_topleft = QRadioButton("Kiri-Atas / Top-Left", form_group)
+        self.btn_group_align.addButton(self.radio_align_center)
+        self.btn_group_align.addButton(self.radio_align_topleft)
+
+        align_btn_layout = QHBoxLayout()
+        align_btn_layout.setSpacing(14)
+        align_btn_layout.addWidget(self.radio_align_center)
+        align_btn_layout.addWidget(self.radio_align_topleft)
+        align_btn_layout.addStretch(1)
+        form_layout.addLayout(align_btn_layout)
+
         layout.addWidget(form_group)
 
         # Connect radio signal
@@ -274,6 +294,13 @@ class FieldEditDialog(QDialog):
 
         self.spin_padding.setValue(max(0, self.field_config.padding))
 
+        # Alignment
+        alignment = getattr(self.field_config, "alignment", "center")
+        if alignment == "top-left":
+            self.radio_align_topleft.setChecked(True)
+        else:
+            self.radio_align_center.setChecked(True)
+
     def _on_save_clicked(self) -> None:
         label = self.edit_label.text().strip()
         sheet_name = self.combo_sheet.currentText().strip()
@@ -311,6 +338,7 @@ class FieldEditDialog(QDialog):
         custom_width = self.spin_width.value() if sizing_mode == "custom" else 0
         custom_height = self.spin_height.value() if sizing_mode == "custom" else 0
         padding = self.spin_padding.value()
+        alignment = "top-left" if self.radio_align_topleft.isChecked() else "center"
 
         field_id = (
             self.field_config.field_id
@@ -327,6 +355,7 @@ class FieldEditDialog(QDialog):
             custom_width=custom_width,
             custom_height=custom_height,
             padding=padding,
+            alignment=alignment,
         )
         self.accept()
 
@@ -516,7 +545,7 @@ class TemplateEditorDialog(QDialog):
 
         # Table Fields
         self.table_fields = QTableWidget(self)
-        self.table_fields.setColumnCount(6)
+        self.table_fields.setColumnCount(7)
         self.table_fields.setHorizontalHeaderLabels([
             "No",
             "Label Field Foto",
@@ -524,6 +553,7 @@ class TemplateEditorDialog(QDialog):
             "Sel Anchor",
             "Mode Ukuran",
             "Padding",
+            "Posisi",
         ])
         self.table_fields.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table_fields.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -539,6 +569,7 @@ class TemplateEditorDialog(QDialog):
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
 
         layout.addWidget(self.table_fields, stretch=1)
 
@@ -654,6 +685,13 @@ class TemplateEditorDialog(QDialog):
             item_pad = QTableWidgetItem(f"{fld.padding} px")
             item_pad.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table_fields.setItem(row_idx, 5, item_pad)
+
+            # 6: Posisi
+            align_val = getattr(fld, "alignment", "center")
+            align_str = "Kiri-Atas" if align_val == "top-left" else "Tengah"
+            item_align = QTableWidgetItem(align_str)
+            item_align.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table_fields.setItem(row_idx, 6, item_align)
 
         self._on_field_selection_changed()
 

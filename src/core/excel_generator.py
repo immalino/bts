@@ -15,7 +15,11 @@ from PIL import Image as PILImage, ImageOps
 from PySide6.QtCore import QThread, Signal
 
 from src.core.models import PhotoFieldConfig, ProjectData, TemplateConfig
-from src.utils.excel_utils import calculate_fitted_dimensions, get_cell_dimensions
+from src.utils.excel_utils import (
+    calculate_fitted_dimensions,
+    calculate_image_anchor,
+    get_cell_dimensions,
+)
 
 
 class ExcelGeneratorThread(QThread):
@@ -202,22 +206,47 @@ class ExcelGeneratorThread(QThread):
                                 padding=field.padding,
                             )
 
-                        # 5. Resize proporsional dengan filter LANCZOS
-                        resized_img = pil_img.resize(
-                            (target_w, target_h), PILImage.Resampling.LANCZOS
-                        )
+                        # 5. Pertahankan resolusi tinggi foto (High-Resolution Preservation)
+                        # Agar foto tidak blur saat dibuka atau di-zoom di Excel, resolusi bitmap fisik
+                        # tetap dipertahankan tajam (hanya di-downscale jika melebihi batas aman 2560px).
+                        MAX_IMAGE_DIMENSION = 2560
+                        max_orig_dim = max(orig_w, orig_h)
+                        if max_orig_dim > MAX_IMAGE_DIMENSION:
+                            scale_factor = MAX_IMAGE_DIMENSION / float(max_orig_dim)
+                            hi_res_w = max(1, int(round(orig_w * scale_factor)))
+                            hi_res_h = max(1, int(round(orig_h * scale_factor)))
+                            export_img = pil_img.resize(
+                                (hi_res_w, hi_res_h), PILImage.Resampling.LANCZOS
+                            )
+                        else:
+                            export_img = pil_img
 
-                        # 6. Simpan gambar sementara ke disk
-                        temp_img_path = os.path.join(
-                            temp_dir, f"img_{field.field_id}_{idx}.png"
-                        )
-                        resized_img.save(temp_img_path, format="PNG")
+                        # 6. Simpan gambar sementara dengan format & kualitas tinggi
+                        if export_img.mode == "RGBA":
+                            temp_img_path = os.path.join(
+                                temp_dir, f"img_{field.field_id}_{idx}.png"
+                            )
+                            export_img.save(temp_img_path, format="PNG")
+                        else:
+                            temp_img_path = os.path.join(
+                                temp_dir, f"img_{field.field_id}_{idx}.jpg"
+                            )
+                            export_img.save(
+                                temp_img_path, format="JPEG", quality=95, optimize=True
+                            )
 
-                    # 7. Tambahkan ke worksheet openpyxl
+                    # 7. Tambahkan ke worksheet openpyxl dengan ukuran tampilan proporsional & perataan
                     openpyxl_img = OpenpyxlImage(temp_img_path)
                     openpyxl_img.width = target_w
                     openpyxl_img.height = target_h
-                    ws.add_image(openpyxl_img, field.cell_anchor)
+                    openpyxl_img.anchor = calculate_image_anchor(
+                        worksheet=ws,
+                        cell_coordinate=field.cell_anchor,
+                        img_width=target_w,
+                        img_height=target_h,
+                        alignment=getattr(field, "alignment", "center"),
+                    )
+                    ws.add_image(openpyxl_img)
 
                     success_count += 1
                     self.item_finished.emit(

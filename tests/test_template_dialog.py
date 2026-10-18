@@ -178,14 +178,16 @@ def test_field_edit_dialog_save_valid(qapp, monkeypatch):
     assert res.cell_anchor == "B5"
     assert res.sizing_mode == "fit_to_cell"
     assert res.padding == 3
+    assert res.alignment == "center"
     dialog.close()
 
-    # 2. Mode custom sizing
+    # 2. Mode custom sizing dengan top-left alignment
     dialog2 = FieldEditDialog()
     dialog2.edit_label.setText("Foto Perangkat")
     dialog2.combo_sheet.setCurrentText("Equipment")
     dialog2.edit_cell.setText("C10")
     dialog2.radio_custom.setChecked(True)
+    dialog2.radio_align_topleft.setChecked(True)
     dialog2.spin_width.setValue(450)
     dialog2.spin_height.setValue(350)
     dialog2.spin_padding.setValue(4)
@@ -198,6 +200,7 @@ def test_field_edit_dialog_save_valid(qapp, monkeypatch):
     assert res2.custom_width == 450
     assert res2.custom_height == 350
     assert res2.padding == 4
+    assert res2.alignment == "top-left"
     dialog2.close()
 
 

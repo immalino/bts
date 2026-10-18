@@ -312,3 +312,4 @@ def test_e2e_excel_cancellation(
     # File output tidak boleh tersimpan karena proses dibatalkan
     assert not os.path.exists(out_file)
     window.close()
+

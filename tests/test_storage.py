@@ -26,6 +26,7 @@ class TestModels:
         assert field.custom_width == 0
         assert field.custom_height == 0
         assert field.padding == 2
+        assert field.alignment == "center"
 
         d = field.to_dict()
         assert d["field_id"] == "antenna_sec1"
@@ -34,6 +35,7 @@ class TestModels:
         assert d["cell_anchor"] == "B5"
         assert d["sizing_mode"] == "fit_to_cell"
         assert d["padding"] == 2
+        assert d["alignment"] == "center"
 
         reconstructed = PhotoFieldConfig.from_dict(d)
         assert reconstructed == field

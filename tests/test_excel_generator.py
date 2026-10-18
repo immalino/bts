@@ -19,7 +19,11 @@ import pytest
 
 from src.core.excel_generator import ExcelGeneratorThread
 from src.core.models import PhotoFieldConfig, ProjectData, TemplateConfig
-from src.utils.excel_utils import calculate_fitted_dimensions, get_cell_dimensions
+from src.utils.excel_utils import (
+    calculate_fitted_dimensions,
+    calculate_image_anchor,
+    get_cell_dimensions,
+)
 
 
 # =====================================================================
@@ -174,6 +178,59 @@ class TestExcelUtils:
         w, h = calculate_fitted_dimensions(500, 500, 10, 10, padding=20)
         assert w >= 1
         assert h >= 1
+
+    def test_calculate_image_anchor_single_cell_center(self):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.column_dimensions["B"].width = 20.0  # round(20*7+5) = 145 px
+        ws.row_dimensions[5].height = 50.0      # round(50*96/72) = 67 px
+
+        anchor = calculate_image_anchor(ws, "B5", 45, 27, alignment="center")
+        # Col B is index 1, row 5 is index 4
+        assert anchor._from.col == 1
+        assert anchor._from.row == 4
+        # Expected offsets: (145 - 45) // 2 = 50 px; (67 - 27) // 2 = 20 px
+        assert anchor._from.colOff == 50 * 9525
+        assert anchor._from.rowOff == 20 * 9525
+        assert anchor.ext.cx == 45 * 9525
+        assert anchor.ext.cy == 27 * 9525
+
+    def test_calculate_image_anchor_single_cell_top_left(self):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.column_dimensions["B"].width = 20.0
+        ws.row_dimensions[5].height = 50.0
+
+        anchor = calculate_image_anchor(ws, "B5", 45, 27, alignment="top-left")
+        assert anchor._from.col == 1
+        assert anchor._from.row == 4
+        assert anchor._from.colOff == 0
+        assert anchor._from.rowOff == 0
+
+    def test_calculate_image_anchor_merged_cell_center(self):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.column_dimensions["B"].width = 20.0  # 145 px
+        ws.column_dimensions["C"].width = 20.0  # 145 px -> total 290 px
+        ws.row_dimensions[5].height = 30.0      # 40 px
+        ws.row_dimensions[6].height = 30.0      # 40 px -> total 80 px
+        ws.merge_cells("B5:C6")
+
+        # Gambar 90 x 40 px: offset_x = (290 - 90)//2 = 100 px (within B: 100 < 145)
+        # offset_y = (80 - 40)//2 = 20 px (within Row 5: 20 < 40)
+        anchor = calculate_image_anchor(ws, "B5", 90, 40, alignment="center")
+        assert anchor._from.col == 1
+        assert anchor._from.row == 4
+        assert anchor._from.colOff == 100 * 9525
+        assert anchor._from.rowOff == 20 * 9525
+
+    def test_calculate_image_anchor_invalid(self):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        with pytest.raises(ValueError):
+            calculate_image_anchor(ws, "", 100, 100)
+        with pytest.raises(ValueError):
+            calculate_image_anchor(ws, "INVALID_XYZ", 100, 100)
 
 
 # =====================================================================
@@ -488,4 +545,59 @@ class TestExcelGeneratorThread:
         _, success, fail, errors = completed[0]
         assert "dibatalkan" in errors[0]
         assert not os.path.exists(output_file)
+
+    def test_high_resolution_image_preservation(
+        self, tmp_path: Path, dummy_template_path: str
+    ):
+        """
+        Memastikan foto beresolusi tinggi (misal 1600x1200) yang disematkan ke sel kecil
+        tetap mempertahankan resolusi piksel fisiknya di dalam arsip Excel (tidak di-downsample
+        hingga seukuran sel), sehingga foto tidak blur ketika dilihat atau di-zoom.
+        """
+        import io
+        import zipfile
+
+        output_file = str(tmp_path / "high_res_test.xlsx")
+        high_res_photo = str(tmp_path / "large_photo.jpg")
+
+        # Buat gambar resolusi 1600 x 1200
+        Image.new("RGB", (1600, 1200), color="blue").save(
+            high_res_photo, format="JPEG", quality=95
+        )
+
+        field = PhotoFieldConfig(
+            field_id="f_highres",
+            label="Foto High Res",
+            sheet_name="Equipment",
+            cell_anchor="B4",
+            sizing_mode="fit_to_cell",
+        )
+
+        thread = ExcelGeneratorThread(
+            template=dummy_template_path,
+            output_path=output_file,
+            fields=[field],
+            photo_assignments={"f_highres": high_res_photo},
+        )
+        thread.run()
+
+        assert os.path.exists(output_file)
+
+        # 1. Periksa ukuran tampilan pada lembar kerja Excel (tetap fit di sel)
+        wb = openpyxl.load_workbook(output_file)
+        ws = wb["Equipment"]
+        assert len(ws._images) == 1
+        img = ws._images[0]
+        disp_w = round(img.anchor.ext.cx / 9525)
+        disp_h = round(img.anchor.ext.cy / 9525)
+        assert disp_w <= 300
+        assert disp_h <= 100
+
+        # 2. Buka arsip zip Excel dan verifikasi piksel fisik gambar media tetap 1600x1200 (tajam)
+        with zipfile.ZipFile(output_file, "r") as z:
+            media_files = [n for n in z.namelist() if n.startswith("xl/media/")]
+            assert len(media_files) >= 1
+            raw_bytes = z.read(media_files[0])
+            with Image.open(io.BytesIO(raw_bytes)) as embedded_img:
+                assert embedded_img.size == (1600, 1200)
 
