@@ -493,11 +493,11 @@ Menghubungkan tombol "Proses Ekspor" dengan logika validasi dan background worke
 - `src/ui/main_window.py` (integrasi ekspor, status bar, progress bar)
 
 #### 📋 Checklist Tugas Sesi 6
-- [ ] Buat `src/ui/report_dialog.py`:
+- [x] Buat `src/ui/report_dialog.py`:
   - Menampilkan ringkasan: Total Diproses, Berhasil, Gagal, Dilewati.
   - Tabel rincian error (Nomor Baris, Nama File Sumber, Nama Target, Alasan Error).
   - Tombol "Buka Folder Output" di File Explorer (`os.startfile` di Windows atau `xdg-open` di Linux).
-- [ ] Modifikasi `src/ui/main_window.py`:
+- [x] Modifikasi `src/ui/main_window.py`:
   - Tambahkan komponen `QProgressBar` dan label status di bagian footer.
   - Tambahkan tombol utama "🚀 Proses Ekspor".
   - Implementasikan method `start_export()`:

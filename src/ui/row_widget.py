@@ -275,6 +275,7 @@ class RowWidget(QFrame):
         return {
             "row_index": self.row_index,
             "source_photo": self.source_photo,
+            "source_path": self.source_photo,
             "target_stem": stem,
             "extension": self._extension,
             "target_name": target_fullname,
@@ -317,22 +318,26 @@ class RowWidget(QFrame):
         self._update_status_badge()
 
     def _update_status_badge(self) -> None:
-        """Memperbarui tampilan visual badge status."""
+        """Memperbarui tampilan visual badge status dan border baris."""
         text = self._status
         tooltip = self._status_message
 
         if self._status == RowStatus.READY:
             bg_color = "#DCFCE7"  # Hijau lembut
             text_color = "#166534"
+            border_left = "4px solid #16A34A"
         elif self._status == RowStatus.SUCCESS:
             bg_color = "#D1FAE5"  # Hijau sukses terang
             text_color = "#065F46"
+            border_left = "4px solid #10B981"
         elif self._status == RowStatus.ERROR:
             bg_color = "#FEE2E2"  # Merah lembut
             text_color = "#991B1B"
+            border_left = "4px solid #EF4444"
         else:  # EMPTY / default
             bg_color = "#F1F5F9"  # Abu-abu lembut
             text_color = ThemeColors.TEXT_MUTED
+            border_left = "4px solid transparent"
 
         self.lbl_status.setText(text)
         self.lbl_status.setToolTip(tooltip)
@@ -345,3 +350,11 @@ class RowWidget(QFrame):
                 font-weight: 600;
             }}
         """)
+        self.setStyleSheet(f"""
+            QFrame#RowWidget {{
+                background-color: {ThemeColors.SURFACE};
+                border-bottom: 1px solid {ThemeColors.BORDER};
+                border-left: {border_left};
+            }}
+        """)
+

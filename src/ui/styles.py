@@ -230,4 +230,81 @@ QMessageBox QLabel {{
     color: {ThemeColors.TEXT};
     font-size: 12px;
 }}
+
+/* ==========================================================================
+   Export Action Button
+   ========================================================================== */
+QPushButton#ExportButton {{
+    background-color: {ThemeColors.PRIMARY};
+    color: #FFFFFF;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 8px 20px;
+}}
+
+QPushButton#ExportButton:hover {{
+    background-color: {ThemeColors.PRIMARY_HOVER};
+}}
+
+QPushButton#ExportButton:pressed {{
+    background-color: #1E40AF;
+}}
+
+QPushButton#ExportButton:disabled {{
+    background-color: #94A3B8;
+    color: #E2E8F0;
+}}
+
+/* ==========================================================================
+   Progress Bar
+   ========================================================================== */
+QProgressBar {{
+    background-color: #E2E8F0;
+    border: none;
+    border-radius: 4px;
+    height: 10px;
+    text-align: center;
+    font-size: 9px;
+    font-weight: 600;
+    color: {ThemeColors.TEXT};
+}}
+
+QProgressBar::chunk {{
+    background-color: {ThemeColors.PRIMARY};
+    border-radius: 4px;
+}}
+
+/* ==========================================================================
+   Table Widget & Headers
+   ========================================================================== */
+QTableWidget {{
+    background-color: {ThemeColors.SURFACE};
+    border: 1px solid {ThemeColors.BORDER};
+    border-radius: 6px;
+    gridline-color: #F1F5F9;
+    font-size: 12px;
+}}
+
+QTableWidget::item {{
+    padding: 6px 8px;
+    border-bottom: 1px solid #F1F5F9;
+}}
+
+QTableWidget::item:selected {{
+    background-color: #EFF6FF;
+    color: {ThemeColors.TEXT};
+}}
+
+QHeaderView::section {{
+    background-color: #F8FAFC;
+    color: {ThemeColors.TEXT_MUTED};
+    font-size: 11px;
+    font-weight: 600;
+    padding: 6px 8px;
+    border: none;
+    border-bottom: 1px solid {ThemeColors.BORDER};
+}}
 """
+

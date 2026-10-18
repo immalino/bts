@@ -3,6 +3,7 @@ Photo Rename Studio - Jendela Utama (MainWindow)
 """
 
 import os
+import re
 from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import Qt
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
@@ -22,8 +24,12 @@ from PySide6.QtWidgets import (
 )
 
 from src.config import DEFAULT_ROW_COUNT, ThemeColors
+from src.core.exporter import ExportTask, ExporterThread
 from src.core.importer import import_names_from_csv, import_names_from_txt
+from src.core.validator import validate_batch
+from src.ui.report_dialog import ReportDialog
 from src.ui.row_widget import RowStatus, RowWidget
+from src.utils.file_utils import split_filename_and_ext
 
 
 class MainWindow(QMainWindow):
@@ -34,17 +40,19 @@ class MainWindow(QMainWindow):
     - Header aplikasi dengan panduan ringkas.
     - Toolbar aksi: Impor Nama (TXT/CSV), Tambah Baris, Hapus Baris Kosong, Reset.
     - Area tengah: QScrollArea vertikal dengan 100 baris RowWidget secara default.
-    - Panel bawah: Pemilihan Folder Output dan opsi Checkbox Overwrite.
+    - Panel bawah: Pemilihan Folder Output, opsi Checkbox Overwrite, Progress Bar, Status, dan Tombol Ekspor.
     """
 
     def __init__(self, default_rows: int = DEFAULT_ROW_COUNT):
         super().__init__()
         self.default_rows_count: int = default_rows
         self.row_widgets: List[RowWidget] = []
+        self.exporter_thread: Optional[ExporterThread] = None
 
         self._init_ui()
         self._setup_connections()
         self.init_rows(self.default_rows_count)
+
 
     def _init_ui(self) -> None:
         self.setWindowTitle("Photo Rename Studio")
@@ -201,6 +209,48 @@ class MainWindow(QMainWindow):
 
         footer_layout.addLayout(opt_layout)
 
+        # Baris 3: Progress Bar & Label Status Ekspor
+        progress_layout = QVBoxLayout()
+        progress_layout.setSpacing(4)
+
+        self.lbl_export_status = QLabel("Siap untuk mengekspor.", self.footer_card)
+        self.lbl_export_status.setStyleSheet(f"""
+            font-size: 11px;
+            font-weight: 500;
+            color: {ThemeColors.TEXT_MUTED};
+        """)
+        progress_layout.addWidget(self.lbl_export_status)
+
+        self.progress_bar = QProgressBar(self.footer_card)
+        self.progress_bar.setFixedHeight(8)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(False)
+        progress_layout.addWidget(self.progress_bar)
+
+        footer_layout.addLayout(progress_layout)
+
+        # Baris 4: Tombol Aksi Ekspor & Tombol Batal
+        action_layout = QHBoxLayout()
+        action_layout.setSpacing(10)
+
+        self.btn_cancel_export = QPushButton("⏹ Batal Ekspor", self.footer_card)
+        self.btn_cancel_export.setObjectName("DangerButton")
+        self.btn_cancel_export.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_cancel_export.setEnabled(False)
+        self.btn_cancel_export.setVisible(False)
+        action_layout.addWidget(self.btn_cancel_export)
+
+        action_layout.addStretch(1)
+
+        self.btn_export = QPushButton("🚀 Proses Ekspor", self.footer_card)
+        self.btn_export.setObjectName("ExportButton")
+        self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_export.setToolTip("Mulai validasi dan ekspor foto secara aman ke folder tujuan")
+        action_layout.addWidget(self.btn_export)
+
+        footer_layout.addLayout(action_layout)
+
         self.main_layout.addWidget(self.footer_card)
 
     def _setup_connections(self) -> None:
@@ -210,6 +260,9 @@ class MainWindow(QMainWindow):
         self.btn_remove_empty.clicked.connect(self.on_remove_empty_clicked)
         self.btn_reset.clicked.connect(self.on_reset_all_clicked)
         self.btn_browse_dir.clicked.connect(self.on_choose_directory_clicked)
+        self.btn_export.clicked.connect(self.start_export)
+        self.btn_cancel_export.clicked.connect(self.cancel_export)
+
 
     # =========================================================================
     # Manajemen Baris (Row Management)
@@ -326,7 +379,15 @@ class MainWindow(QMainWindow):
         """Eksekusi reset semua data."""
         self.input_output_dir.clear()
         self.chk_overwrite.setChecked(False)
+        self.progress_bar.setValue(0)
+        self.lbl_export_status.setText("Siap untuk mengekspor.")
+        self.lbl_export_status.setStyleSheet(f"""
+            font-size: 11px;
+            font-weight: 500;
+            color: {ThemeColors.TEXT_MUTED};
+        """)
         self.init_rows(self.default_rows_count)
+
 
     # =========================================================================
     # Impor Nama (TXT / CSV)
@@ -457,3 +518,208 @@ class MainWindow(QMainWindow):
             stats_text += f" | Error: {error_count}"
 
         self.lbl_stats.setText(stats_text)
+
+    # =========================================================================
+    # Alur Proses Ekspor (Export Pipeline)
+    # =========================================================================
+
+    def start_export(self) -> None:
+        """
+        Memulai proses validasi dan ekspor seluruh baris aktif:
+        1. Kumpulkan data seluruh baris aktif.
+        2. Jalankan validasi batch (validate_batch).
+        3. Jika tidak valid, sorot baris yang bermasalah dan munculkan pesan error.
+        4. Jika valid, kunci UI dan jalankan ExporterThread di background thread (non-blocking).
+        """
+        raw_items = []
+        for row in self.row_widgets:
+            data = row.get_data()
+            raw_items.append({
+                "row_index": row.row_index,
+                "source_path": data.get("source_photo") or "",
+                "target_name": data.get("target_name") or "",
+            })
+
+        output_dir = self.get_output_directory()
+        allow_overwrite = self.is_overwrite_allowed()
+
+        is_valid, error_list = validate_batch(
+            row_items=raw_items,
+            output_dir=output_dir,
+            allow_overwrite=allow_overwrite,
+        )
+
+        if not is_valid:
+            first_problematic_row: Optional[RowWidget] = None
+            for err in error_list:
+                match = re.search(r"Baris (\d+):", err)
+                if match:
+                    row_idx = int(match.group(1))
+                    for row in self.row_widgets:
+                        if row.row_index == row_idx:
+                            row.set_status(RowStatus.ERROR, err)
+                            if first_problematic_row is None:
+                                first_problematic_row = row
+                            break
+
+            self.update_summary_stats()
+
+            if first_problematic_row is not None:
+                self.scroll_area.ensureWidgetVisible(first_problematic_row)
+            elif not output_dir or not os.path.isdir(output_dir):
+                self.input_output_dir.setFocus()
+
+            self.lbl_export_status.setText("Validasi gagal: perbaiki baris yang bermasalah.")
+            self.lbl_export_status.setStyleSheet(
+                f"font-size: 11px; font-weight: 600; color: {ThemeColors.ERROR};"
+            )
+
+            max_display = 8
+            err_summary = "\n• " + "\n• ".join(error_list[:max_display])
+            if len(error_list) > max_display:
+                err_summary += f"\n... dan {len(error_list) - max_display} kesalahan lainnya."
+
+            QMessageBox.warning(
+                self,
+                "Validasi Ekspor Gagal",
+                f"Ditemukan kendala sebelum ekspor dapat dimulai:\n{err_summary}",
+            )
+            return
+
+        # Kumpulkan tugas ekspor yang valid
+        tasks: List[ExportTask] = []
+        for row in self.row_widgets:
+            data = row.get_data()
+            src = data.get("source_photo")
+            tgt = data.get("target_name")
+            if src and tgt:
+                _, src_ext = split_filename_and_ext(src)
+                tgt_stem, tgt_ext = split_filename_and_ext(tgt)
+                final_ext = tgt_ext if tgt_ext else src_ext
+                final_filename = f"{tgt_stem}{final_ext}"
+                tasks.append(ExportTask(
+                    source_path=src,
+                    target_filename=final_filename,
+                    row_index=row.row_index,
+                ))
+
+        if not tasks:
+            QMessageBox.information(
+                self,
+                "Tidak Ada Foto",
+                "Tidak ada baris foto dan nama yang siap untuk diekspor.",
+            )
+            return
+
+        # Kunci kontrol UI dan mulai proses ekspor di background thread
+        self._set_exporting_state(True)
+        self.progress_bar.setRange(0, len(tasks))
+        self.progress_bar.setValue(0)
+        self.lbl_export_status.setText(f"Menyiapkan ekspor {len(tasks)} foto...")
+        self.lbl_export_status.setStyleSheet(
+            f"font-size: 11px; font-weight: 500; color: {ThemeColors.TEXT_MUTED};"
+        )
+
+        self.exporter_thread = ExporterThread(
+            tasks=tasks,
+            output_directory=output_dir,
+            allow_overwrite=allow_overwrite,
+            parent=self,
+        )
+        self.exporter_thread.progress_updated.connect(self._on_export_progress)
+        self.exporter_thread.item_finished.connect(self._on_export_item_finished)
+        self.exporter_thread.export_completed.connect(self._on_export_completed)
+        self.exporter_thread.start()
+
+    def cancel_export(self) -> None:
+        """Membatalkan proses ekspor yang sedang berlangsung."""
+        if self.exporter_thread and self.exporter_thread.isRunning():
+            self.exporter_thread.cancel()
+            self.btn_cancel_export.setEnabled(False)
+            self.lbl_export_status.setText("Membatalkan proses ekspor...")
+
+    def _set_exporting_state(self, exporting: bool) -> None:
+        """Mengunci atau membuka kembali kontrol UI selama proses ekspor berlangsung."""
+        self.btn_export.setEnabled(not exporting)
+        self.btn_import.setEnabled(not exporting)
+        self.btn_add_row.setEnabled(not exporting)
+        self.btn_remove_empty.setEnabled(not exporting)
+        self.btn_reset.setEnabled(not exporting)
+        self.btn_browse_dir.setEnabled(not exporting)
+        self.input_output_dir.setEnabled(not exporting)
+        self.chk_overwrite.setEnabled(not exporting)
+
+        self.btn_cancel_export.setVisible(exporting)
+        self.btn_cancel_export.setEnabled(exporting)
+
+        for row in self.row_widgets:
+            row.input_name.setEnabled(not exporting)
+            row.btn_select.setEnabled(not exporting)
+            row.btn_clear.setEnabled(not exporting)
+
+    def _on_export_progress(self, current_index: int, total: int, current_filename: str) -> None:
+        """Memperbarui progress bar dan status label secara real-time."""
+        self.progress_bar.setValue(current_index)
+        self.lbl_export_status.setText(f"Menyalin ({current_index}/{total}): {current_filename}")
+        self.lbl_export_status.setStyleSheet(
+            f"font-size: 11px; font-weight: 500; color: {ThemeColors.TEXT_MUTED};"
+        )
+
+    def _on_export_item_finished(self, row_index: int, success: bool, message: str) -> None:
+        """Memperbarui status badge dan border baris secara real-time saat selesai disalin."""
+        for row in self.row_widgets:
+            if row.row_index == row_index:
+                if success:
+                    row.set_status(RowStatus.SUCCESS, message)
+                else:
+                    row.set_status(RowStatus.ERROR, message)
+                break
+        self.update_summary_stats()
+
+    def _on_export_completed(
+        self,
+        success_count: int,
+        fail_count: int,
+        skipped_count: int,
+        errors: list,
+    ) -> None:
+        """Menangani selesainya proses ekspor dan menampilkan modal dialog laporan."""
+        self._set_exporting_state(False)
+        self.progress_bar.setValue(self.progress_bar.maximum())
+        status_text = f"Selesai: {success_count} berhasil, {fail_count} gagal, {skipped_count} dilewati."
+        self.lbl_export_status.setText(status_text)
+        color = ThemeColors.SUCCESS if fail_count == 0 else ThemeColors.WARNING
+        self.lbl_export_status.setStyleSheet(
+            f"font-size: 11px; font-weight: 600; color: {color};"
+        )
+        self.update_summary_stats()
+
+        dialog = ReportDialog(
+            success_count=success_count,
+            fail_count=fail_count,
+            skipped_count=skipped_count,
+            errors=errors,
+            output_directory=self.get_output_directory(),
+            parent=self,
+        )
+        dialog.exec()
+
+    def closeEvent(self, event) -> None:
+        """Menangani penutupan jendela saat proses ekspor masih berlangsung."""
+        if hasattr(self, "exporter_thread") and self.exporter_thread and self.exporter_thread.isRunning():
+            reply = QMessageBox.question(
+                self,
+                "Ekspor Masih Berjalan",
+                "Proses ekspor masih berlangsung di latar belakang.\nApakah Anda yakin ingin membatalkan dan keluar?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.exporter_thread.cancel()
+                self.exporter_thread.wait(2000)
+                event.accept()
+            else:
+                event.ignore()
+        else:
+            event.accept()
+

@@ -47,3 +47,28 @@ def sanitize_filename(name: str, replacement: str = "_") -> str:
     # Hapus spasi dan titik di awal dan akhir
     sanitized = sanitized.strip(" .")
     return sanitized
+
+
+def open_folder_in_explorer(folder_path: str) -> bool:
+    """
+    Membuka folder di file explorer sistem (Windows Explorer, macOS Finder, atau Linux File Manager).
+    Mengembalikan True jika perintah berhasil dijalankan, False jika gagal.
+    """
+    import subprocess
+    import sys
+
+    if not folder_path or not os.path.isdir(folder_path):
+        return False
+
+    abs_path = os.path.abspath(folder_path)
+    try:
+        if sys.platform == "win32":
+            os.startfile(abs_path)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", abs_path])
+        else:
+            subprocess.Popen(["xdg-open", abs_path])
+        return True
+    except Exception:
+        return False
+
