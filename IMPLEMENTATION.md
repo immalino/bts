@@ -703,17 +703,17 @@ Mengintegrasikan pustaka `openpyxl` ke dalam dependensi proyek, menyusun struktu
 - `tests/test_storage.py` (unit test persistence & validasi)
 
 #### 📋 Checklist Tugas Sesi 8
-- [ ] Tambahkan `openpyxl>=3.1.2` ke `requirements.txt` dan instal ke `venv`.
-- [ ] Buat file `src/core/models.py` dengan:
+- [x] Tambahkan `openpyxl>=3.1.2` ke `requirements.txt` dan instal ke `venv`.
+- [x] Buat file `src/core/models.py` dengan:
   - `PhotoFieldConfig`: `field_id`, `label`, `sheet_name`, `cell_anchor`, `sizing_mode` ("fit_to_cell" atau "custom"), `custom_width`, `custom_height`, `padding`.
   - `TemplateConfig`: `template_id`, `name`, `template_file_path`, `fields: List[PhotoFieldConfig]`, `created_at`, `updated_at`.
   - `ProjectData`: `project_id`, `site_name`, `template_id`, `photo_assignments: Dict[str, str]` (field_id -> photo_path), `output_dir`, `created_at`, `last_exported_at`.
-- [ ] Buat file `src/core/storage.py` (`StorageManager`):
+- [x] Buat file `src/core/storage.py` (`StorageManager`):
   - Inisialisasi direktori penyimpanan lokal (misal: `data/templates/` dan `data/projects/`).
   - Metode CRUD Template: `save_template()`, `load_template()`, `list_templates()`, `delete_template()`.
   - Metode CRUD Project: `save_project()`, `load_project()`, `list_projects()`, `delete_project()`.
-- [ ] Buat test suite di `tests/test_storage.py` untuk menguji penyimpanan, pemuatan, dan penanganan file korup.
-- [ ] Jalankan `pytest tests/test_storage.py` dan pastikan seluruh test PASSED 100%.
+- [x] Buat test suite di `tests/test_storage.py` untuk menguji penyimpanan, pemuatan, dan penanganan file korup.
+- [x] Jalankan `pytest tests/test_storage.py` dan pastikan seluruh test PASSED 100%.
 
 #### 🧪 Cara Verifikasi Sesi 8
 ```bash
