@@ -13,6 +13,7 @@ from src.ui.styles import APP_STYLESHEET
 
 def main() -> int:
     """Fungsi utama untuk menginisialisasi dan menjalankan aplikasi Photo Rename Studio."""
+    print("Memulai Photo Rename Studio...")
     app = QApplication.instance()
     if app is None:
         app = QApplication(sys.argv)
@@ -29,7 +30,10 @@ def main() -> int:
     # Inisialisasi dan tampilkan jendela utama
     window = MainWindow()
     window.show()
+    window.raise_()
+    window.activateWindow()
 
+    print("Photo Rename Studio siap. Tutup jendela aplikasi untuk mengakhiri.")
     return app.exec()
 
 

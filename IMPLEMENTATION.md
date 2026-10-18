@@ -647,6 +647,7 @@ git commit -m "feat(sesi-7): konfigurasi build pyinstaller exe, readme komprehen
 
 Beri tanda centang `[x]` dan tanggal ketika sesi selesai dikerjakan:
 
+### Tahap 1: Pondasi & Photo Rename Studio (Selesai)
 - [x] **Sesi 1: Setup Environment & Konfigurasi** *(Tanggal: 2026-10-18)*
 - [x] **Sesi 2: Core Logic (Validator & Importer) + Unit Tests** *(Tanggal: 2026-10-18)*
 - [x] **Sesi 3: Core Exporter & Threading Salin Aman** *(Tanggal: 2026-10-18)*
@@ -654,3 +655,349 @@ Beri tanda centang `[x]` dan tanggal ketika sesi selesai dikerjakan:
 - [x] **Sesi 5: MainWindow & ScrollArea 100 Baris** *(Tanggal: 2026-10-18)*
 - [x] **Sesi 6: Integrasi Ekspor, Progress Bar & Laporan** *(Tanggal: 2026-10-18)*
 - [x] **Sesi 7: Build Windows EXE, Dokumentasi & Final Check** *(Tanggal: 2026-10-18)*
+
+### Tahap 2: Otomatisasi Dokumen Laporan BTS Telkom (Excel Document Generator)
+- [ ] **Sesi 8: Setup openpyxl, Data Model Template & Project Storage (Core)** *(Tanggal: -)*
+- [ ] **Sesi 9: Core Excel Generator Engine (QThread & Auto-Fit Cell)** *(Tanggal: -)*
+- [ ] **Sesi 10: UI Template Manager & Editor Dialog (Visual Config)** *(Tanggal: -)*
+- [ ] **Sesi 11: UI Project Manager & Dynamic Photo Workspace** *(Tanggal: -)*
+- [ ] **Sesi 12: Integrasi Ekspor 1-Klik, Laporan Hasil, & Verifikasi Akhir** *(Tanggal: -)*
+
+---
+
+## 🚀 6. ROADMAP TAHAP 2: Otomatisasi Dokumen Laporan BTS Telkom (Excel Document Generator)
+
+> **Konteks & Kebutuhan Pengguna**:  
+> Pengguna bertindak sebagai **Document Control** di perusahaan telekomunikasi (Telkom) yang menyusun laporan dokumentasi instalasi perangkat tower BTS. Dokumen laporan berupa file Excel (`.xlsx`) bertingkat dengan multi-sheet (misal: Sheet Info Site, Sheet Antenna, Sheet CME/Power, dsb).  
+> Pengguna memerlukan kendali penuh atas:
+> 1. **Nama Field Foto**: Kustomisasi label field sesuai item pekerjaan (misal: "Foto Antenna Sektor 1", "Foto RRU", "Foto Grounding").
+> 2. **Penempatan Presisi**: Memilih sheet target dan koordinat sel/merged cell (misal: Sheet `Antenna`, Sel `B5`).
+> 3. **Auto-Fit Dimensi Sel**: Foto otomatis disesuaikan ukurannya mengikuti lebar & tinggi sel di template Excel tanpa merusak rasio aspek.
+> 4. **Template Tersimpan**: Aturan konfigurasi disimpan sebagai template yang dapat digunakan berulang kali untuk berbagai site.
+> 5. **Riwayat Proyek Site**: Menyimpan data input foto per site agar dapat dibuka dan diedit kembali sewaktu-waktu.
+> 6. **1 Kali Jalan (One-Stop Workflow)**: Menghilangkan proses manual rename file di Windows; foto dimasukkan langsung ke dokumen Excel dalam 1 klik.
+
+```mermaid
+flowchart TD
+    S8["Sesi 8: openpyxl, Data Model & Storage"] --> S9["Sesi 9: Excel Generator Engine (Auto-Fit)"]
+    S9 --> S10["Sesi 10: UI Template Manager & Editor"]
+    S10 --> S11["Sesi 11: UI Project & Dynamic Workspace"]
+    S11 --> S12["Sesi 12: Integrasi 1-Klik & Verifikasi"]
+```
+
+---
+
+### 📍 SESI 8: Setup openpyxl, Data Model Template & Project Storage (Core)
+
+#### 🎯 Tujuan Sesi
+Mengintegrasikan pustaka `openpyxl` ke dalam dependensi proyek, menyusun struktur data model untuk Template dan Proyek menggunakan Python `dataclasses`, serta membangun modul penyimpanan lokal (`StorageManager`) berbasis file JSON terstruktur untuk menyimpan template dan riwayat proyek site.
+
+#### 💡 Konsep yang Perlu Dipahami
+- **Separation of Configuration & State**: Template menyimpan *aturan* (daftar field, sheet target, sel, ukuran), sedangkan Project menyimpan *state data* (Site ID, foto mana yang dimasukkan ke field mana, waktu ekspor).
+- **JSON Serialization**: Data model dikonversi ke dictionary dan disimpan sebagai berkas `.json` lokal di direktori `data/` atau user app data.
+
+#### 📁 File yang Terlibat
+- `requirements.txt` (menambahkan `openpyxl>=3.1.2`)
+- `src/core/models.py` (definisi `PhotoFieldConfig`, `TemplateConfig`, `ProjectData`)
+- `src/core/storage.py` (`StorageManager` untuk operasi CRUD template & project)
+- `tests/test_storage.py` (unit test persistence & validasi)
+
+#### 📋 Checklist Tugas Sesi 8
+- [ ] Tambahkan `openpyxl>=3.1.2` ke `requirements.txt` dan instal ke `venv`.
+- [ ] Buat file `src/core/models.py` dengan:
+  - `PhotoFieldConfig`: `field_id`, `label`, `sheet_name`, `cell_anchor`, `sizing_mode` ("fit_to_cell" atau "custom"), `custom_width`, `custom_height`, `padding`.
+  - `TemplateConfig`: `template_id`, `name`, `template_file_path`, `fields: List[PhotoFieldConfig]`, `created_at`, `updated_at`.
+  - `ProjectData`: `project_id`, `site_name`, `template_id`, `photo_assignments: Dict[str, str]` (field_id -> photo_path), `output_dir`, `created_at`, `last_exported_at`.
+- [ ] Buat file `src/core/storage.py` (`StorageManager`):
+  - Inisialisasi direktori penyimpanan lokal (misal: `data/templates/` dan `data/projects/`).
+  - Metode CRUD Template: `save_template()`, `load_template()`, `list_templates()`, `delete_template()`.
+  - Metode CRUD Project: `save_project()`, `load_project()`, `list_projects()`, `delete_project()`.
+- [ ] Buat test suite di `tests/test_storage.py` untuk menguji penyimpanan, pemuatan, dan penanganan file korup.
+- [ ] Jalankan `pytest tests/test_storage.py` dan pastikan seluruh test PASSED 100%.
+
+#### 🧪 Cara Verifikasi Sesi 8
+```bash
+./venv/bin/pytest tests/test_storage.py -v
+```
+
+#### 🤖 Prompt untuk AI Agent
+```text
+Halo Agent, tolong kerjakan SESI 8 dari file IMPLEMENTATION.md untuk proyek my-bts.
+
+Tugas yang harus diselesaikan:
+1. Tambahkan openpyxl>=3.1.2 ke requirements.txt dan instal ke environment.
+2. Buat file src/core/models.py dengan dataclass PhotoFieldConfig, TemplateConfig, dan ProjectData lengkap dengan metode to_dict() dan from_dict().
+3. Buat file src/core/storage.py (StorageManager) untuk menyimpan dan membaca template serta project site dalam format JSON.
+4. Tulis unit test di tests/test_storage.py untuk memverifikasi penyimpanan dan pemuatan template & project.
+5. Jalankan pytest dan pastikan semua test 100% lolos.
+6. Buat git commit:
+   git add .
+   git commit -m "feat(sesi-8): data model template, project storage, dan integrasi openpyxl"
+7. Tandai checklist Sesi 8 dengan [x] di IMPLEMENTATION.md.
+```
+
+#### 💾 Perintah Git Commit
+```bash
+git add .
+git commit -m "feat(sesi-8): data model template, project storage, dan integrasi openpyxl"
+```
+
+#### ✅ Kriteria Selesai (Definition of Done)
+1. `openpyxl` terpasang dan siap digunakan.
+2. Model data terdefinisi bersih dengan typing yang ketat.
+3. Modul storage dapat menyimpan dan memuat template serta project site.
+4. Test suite `tests/test_storage.py` lolos 100%.
+
+---
+
+### 📍 SESI 9: Core Excel Generator Engine (QThread & Auto-Fit Cell)
+
+#### 🎯 Tujuan Sesi
+Membangun engine inti pembuat dokumen Excel berbasis `openpyxl` di dalam thread terpisah (`QThread`) yang memuat workbook template, mendeteksi dimensi sel/merged cell target, me-resize foto proporsional (*aspect ratio preserved*), menempelkan gambar ke sheet dan sel yang ditentukan, serta menyimpan file laporan akhir.
+
+#### 💡 Konsep yang Perlu Dipahami
+- **Kalkulasi Dimensi Sel Excel**:
+  - Kolom di openpyxl dihitung dalam unit karakter (`ws.column_dimensions[col].width`). Konversi standar: `lebar_px ≈ lebar_char * 7 + 5`.
+  - Baris di openpyxl dihitung dalam points (`ws.row_dimensions[row].height`). Konversi: `tinggi_px ≈ tinggi_pt * (96 / 72) ≈ tinggi_pt * 1.333`.
+  - **Merged Cells**: Jika sel anchor (misal `B5`) berada di rentang merged cell (misal `B5:E15`), engine harus menjumlahkan lebar kolom B, C, D, E dan tinggi baris 5 sampai 15 untuk mendapatkan dimensi total kotak!
+- **Proporsional Auto-Fit & Inner Padding**: Gambar di-resize agar pas (*fit*) ke dalam dimensi sel dengan margin kecil (2-4px) sehingga tidak menabrak border sel tabel.
+
+#### 📁 File yang Terlibat
+- `src/utils/excel_utils.py` (helper kalkulasi dimensi sel & deteksi merged cell)
+- `src/core/excel_generator.py` (`ExcelGeneratorThread(QThread)`)
+- `tests/test_excel_generator.py` (unit test generator dengan template dummy)
+
+#### 📋 Checklist Tugas Sesi 9
+- [ ] Buat `src/utils/excel_utils.py`:
+  - `get_cell_dimensions(worksheet, cell_coordinate) -> Tuple[int, int]` (mengembalikan lebar & tinggi dalam piksel, termasuk kalkulasi rentang *merged cells*).
+  - `calculate_fitted_dimensions(img_width, img_height, max_width, max_height, padding) -> Tuple[int, int]`.
+- [ ] Buat `src/core/excel_generator.py`:
+  - Class `ExcelGeneratorThread(QThread)` dengan signal:
+    - `progress_updated(current_step: int, total_steps: int, message: str)`
+    - `item_finished(field_id: str, success: bool, message: str)`
+    - `generation_completed(output_path: str, success_count: int, fail_count: int, errors: list)`
+  - Proses: Buka template asli via `openpyxl.load_workbook()`, iterasi field foto, baca file gambar, orientasikan EXIF secara benar via Pillow, resize proporsional sesuai dimensi sel target, tempel ke sheet via `ws.add_image(img, cell_anchor)`, dan simpan ke file tujuan.
+- [ ] Buat unit test di `tests/test_excel_generator.py`:
+  - Pengujian pembuatan file Excel dengan 3 sheet dan sel merged.
+  - Pengujian verifikasi gambar terpasang di sheet yang sesuai dan dimensi sel dihormati.
+- [ ] Jalankan `pytest tests/test_excel_generator.py` dan pastikan 100% PASSED.
+
+#### 🧪 Cara Verifikasi Sesi 9
+```bash
+./venv/bin/pytest tests/test_excel_generator.py -v
+```
+
+#### 🤖 Prompt untuk AI Agent
+```text
+Halo Agent, tolong kerjakan SESI 9 dari file IMPLEMENTATION.md untuk proyek my-bts.
+
+Tugas yang harus diselesaikan:
+1. Buat src/utils/excel_utils.py untuk kalkulasi dimensi piksel sel tunggal & merged cell di openpyxl serta perhitungan proporsional resize foto.
+2. Buat src/core/excel_generator.py (ExcelGeneratorThread) yang membaca template Excel, menanamkan foto-foto asli ke sheet & sel target, dan menyimpan file laporan final di latar belakang (QThread).
+3. Buat pengujian komprehensif di tests/test_excel_generator.py dengan template multi-sheet dummy.
+4. Pastikan semua unit test lolos 100%.
+5. Buat git commit:
+   git add .
+   git commit -m "feat(sesi-9): core excel generator engine dengan auto-fit cell dan multi-sheet support"
+6. Tandai checklist Sesi 9 dengan [x] di IMPLEMENTATION.md.
+```
+
+#### 💾 Perintah Git Commit
+```bash
+git add .
+git commit -m "feat(sesi-9): core excel generator engine dengan auto-fit cell dan multi-sheet support"
+```
+
+#### ✅ Kriteria Selesai (Definition of Done)
+1. Perhitungan dimensi sel dan merged cell bekerja akurat.
+2. Generator berhasil menghasilkan file `.xlsx` dengan gambar tertanam rapi di sheet & koordinat yang tepat.
+3. Unit test `test_excel_generator.py` lolos 100%.
+
+---
+
+### 📍 SESI 10: UI Template Manager & Editor Dialog (Visual Config)
+
+#### 🎯 Tujuan Sesi
+Membangun antarmuka visual (Dialog) di PySide6 untuk mengelola template laporan: pengguna dapat menambah template baru, memilih file template `.xlsx`, membaca daftar sheet secara otomatis dari file tersebut, menambah/mengedit field foto (nama field, sheet tujuan, sel anchor, mode auto-fit cell), dan menyimpannya ke storage.
+
+#### 💡 Konsep yang Perlu Dipahami
+- **Interactive Sheet Inspector**: Saat pengguna memilih file template `.xlsx` di dialog, aplikasi langsung membaca `openpyxl.load_workbook(filename, read_only=True).sheetnames` dan mengisi dropdown sheet secara otomatis sehingga pengguna tidak perlu mengetik nama sheet secara manual.
+- **Visual Field Table**: Tabel interaktif yang menampilkan daftar field foto, sheet tujuan, sel tujuan, dan tombol aksi (tambah, edit, hapus, naik/turun urutan).
+
+#### 📁 File yang Terlibat
+- `src/ui/template_dialog.py` (`TemplateManagerDialog`, `FieldEditDialog`)
+- `tests/test_template_dialog.py` (unit test visual dialog & form validation)
+
+#### 📋 Checklist Tugas Sesi 10
+- [ ] Buat `src/ui/template_dialog.py`:
+  - `TemplateManagerDialog`: Menampilkan daftar template tersimpan, tombol "Buat Template Baru", "Edit", "Hapus", dan "Pilih Template Aktif".
+  - `TemplateEditorDialog`: Form pengisian nama template, pemilihan file template `.xlsx`, auto-load daftar sheet ke ComboBox.
+  - `FieldEditDialog`: Form detail field foto:
+    - Input Label Field (contoh: "Foto Antenna Sector 1")
+    - Dropdown Sheet Target (pilihan sheet dari file `.xlsx`)
+    - Input Sel Anchor (contoh: "B5")
+    - Checkbox / Radio Mode Ukuran: "Auto-Fit ke Ukuran Sel (Rekomendasi)" atau "Ukuran Kustom (Lebar x Tinggi)".
+- [ ] Hubungkan dengan `StorageManager` untuk menyimpan perubahan konfigurasi template.
+- [ ] Tulis unit test di `tests/test_template_dialog.py` untuk menguji validasi form (nama kosong, file tidak valid, koordinat sel tidak valid).
+- [ ] Jalankan `pytest tests/test_template_dialog.py` dan pastikan 100% PASSED.
+
+#### 🧪 Cara Verifikasi Sesi 10
+```bash
+./venv/bin/pytest tests/test_template_dialog.py -v
+```
+
+#### 🤖 Prompt untuk AI Agent
+```text
+Halo Agent, tolong kerjakan SESI 10 dari file IMPLEMENTATION.md untuk proyek my-bts.
+
+Tugas yang harus diselesaikan:
+1. Bangun dialog PySide6 di src/ui/template_dialog.py untuk manajemen dan pengeditan template laporan Excel.
+2. Implementasikan auto-load nama sheet dari file .xlsx ke dropdown combobox.
+3. Sediakan tabel daftar field foto dengan kemampuan tambah, edit, dan hapus field secara visual.
+4. Integrasikan dengan StorageManager agar template tersimpan permanen di JSON lokal.
+5. Buat pengujian otomatis di tests/test_template_dialog.py dan pastikan lolos 100%.
+6. Buat git commit:
+   git add .
+   git commit -m "feat(sesi-10): antarmuka visual template manager dan editor field foto excel"
+7. Tandai checklist Sesi 10 dengan [x] di IMPLEMENTATION.md.
+```
+
+#### 💾 Perintah Git Commit
+```bash
+git add .
+git commit -m "feat(sesi-10): antarmuka visual template manager dan editor field foto excel"
+```
+
+#### ✅ Kriteria Selesai (Definition of Done)
+1. Pengguna dapat membuat dan mengedit template secara visual tanpa menyentuh kode/file JSON.
+2. Nama sheet terbaca otomatis dari file Excel.
+3. Test suite dialog lolos 100%.
+
+---
+
+### 📍 SESI 11: UI Project Manager & Dynamic Photo Workspace
+
+#### 🎯 Tujuan Sesi
+Membangun sistem manajemen proyek/site (buat proyek site baru, buka riwayat site sebelumnya) dan menyajikan area kerja foto dinamis (*Dynamic Photo Workspace*) di mana baris-baris input foto ditampilkan secara dinamis sesuai daftar field foto dari template yang sedang aktif.
+
+#### 💡 Konsep yang Perlu Dipahami
+- **Dynamic Form Rendering**: Berbeda dari Tahap 1 yang menampilkan 100 baris statis, pada Tahap 2 baris foto digenerate secara dinamis mengikuti jumlah dan nama field pada template yang dipilih pengguna.
+- **Auto-Persistence (State Management)**: Setiap kali pengguna mendrop atau mengganti foto pada field tertentu, perubahan langsung dicatat ke data project aktif sehingga tidak hilang jika aplikasi tertutup.
+
+#### 📁 File yang Terlibat
+- `src/ui/dynamic_row.py` (komponen baris foto dinamis dengan label nama field telkom & badge target sheet/sel)
+- `src/ui/project_dialog.py` (`ProjectManagerDialog` / modal pemilihan site)
+- `src/ui/main_window.py` (integrasi selector project, selector template, dan render workspace dinamis)
+- `tests/test_dynamic_workspace.py` (pengujian integrasi project & workspace)
+
+#### 📋 Checklist Tugas Sesi 11
+- [ ] Buat `src/ui/dynamic_row.py`:
+  - Menampilkan: Nomor urut, Nama Field Foto (teks tebal), Badge Info ("Sheet: Antenna | Sel: B5"), Thumbnail foto, DropZone (drag-and-drop & klik pilih), Tombol Hapus Foto, dan Status (Kosong / Terisi).
+- [ ] Buat `src/ui/project_dialog.py`:
+  - Dialog pemilihan proyek site: Daftar site tersimpan, tombol "Proyek Site Baru" (input Nama/ID Site, pilih Template), tombol "Buka Site", tombol "Hapus Site".
+- [ ] Perbarui `src/ui/main_window.py`:
+  - Header: Menampilkan informasi Site aktif dan Template aktif yang sedang digunakan.
+  - Toolbar: Tombol "Ganti/Pilih Site", Tombol "Kelola Template".
+  - Scroll Area: Me-render daftar `DynamicPhotoRow` sesuai field pada template aktif.
+  - Auto-save perubahan foto ke `ProjectData` aktif.
+- [ ] Tulis pengujian di `tests/test_dynamic_workspace.py`.
+- [ ] Jalankan `pytest tests/test_dynamic_workspace.py` dan pastikan 100% PASSED.
+
+#### 🧪 Cara Verifikasi Sesi 11
+```bash
+./venv/bin/pytest tests/test_dynamic_workspace.py -v
+```
+
+#### 🤖 Prompt untuk AI Agent
+```text
+Halo Agent, tolong kerjakan SESI 11 dari file IMPLEMENTATION.md untuk proyek my-bts.
+
+Tugas yang harus diselesaikan:
+1. Buat widget baris foto dinamis di src/ui/dynamic_row.py yang menampilkan label field kustom, info sheet/sel, thumbnail, dan dropzone.
+2. Buat dialog manajemen proyek site di src/ui/project_dialog.py untuk membuat atau memilih site yang sedang dikerjakan.
+3. Modifikasi src/ui/main_window.py agar area scroll memuat field-field foto dinamis sesuai template aktif dan mendukung auto-save foto ke data proyek.
+4. Buat pengujian otomatis di tests/test_dynamic_workspace.py dan pastikan lolos 100%.
+5. Buat git commit:
+   git add .
+   git commit -m "feat(sesi-11): ui project manager dan workspace foto dinamis berbasis template"
+6. Tandai checklist Sesi 11 dengan [x] di IMPLEMENTATION.md.
+```
+
+#### 💾 Perintah Git Commit
+```bash
+git add .
+git commit -m "feat(sesi-11): ui project manager dan workspace foto dinamis berbasis template"
+```
+
+#### ✅ Kriteria Selesai (Definition of Done)
+1. Pengguna dapat berganti site/proyek dengan mulus.
+2. Workspace menampilkan baris-baris foto sesuai field template aktif.
+3. Foto yang dimasukkan tersimpan otomatis di riwayat project.
+
+---
+
+### 📍 SESI 12: Integrasi Ekspor 1-Klik, Laporan Hasil, & Verifikasi Akhir
+
+#### 🎯 Tujuan Sesi
+Menghubungkan tombol aksi "Generate Dokumen Excel" di UI dengan worker thread `ExcelGeneratorThread`, menyajikan progress bar real-time, menampilkan dialog hasil sukses dengan tombol langsung "Buka Dokumen Excel" dan "Buka Folder", melakukan pengujian end-to-end menyeluruh, serta memperbarui dokumentasi `README.md`.
+
+#### 💡 Konsep yang Perlu Dipahami
+- **Zero-Friction Handover**: Setelah selesai generate, pengguna langsung disajikan dialog laporan dengan tombol satu-klik "Buka File Excel", yang langsung membuka Microsoft Excel / LibreOffice di sistem operasi pengguna untuk memeriksa dokumen laporan.
+- **End-to-End Verification**: Menjamin seluruh alur (Pilih Site $\rightarrow$ Pilih Template $\rightarrow$ Drag Foto $\rightarrow$ Klik Generate) bekerja sempurna tanpa crash atau freeze.
+
+#### 📁 File yang Terlibat
+- `src/ui/main_window.py` (logika trigger generate, progress updates, disable tombol saat proses)
+- `src/ui/report_dialog.py` (penyesuaian dialog laporan untuk dokumen Excel)
+- `tests/test_e2e_excel_flow.py` (pengujian integrasi menyeluruh)
+- `README.md` (pembaruan dokumentasi alur Document Control BTS Telkom)
+
+#### 📋 Checklist Tugas Sesi 12
+- [ ] Hubungkan tombol "🚀 Generate Dokumen Excel" pada footer MainWindow:
+  - Validasi keberadaan file template dan apakah minimal ada 1 foto yang dimasukkan.
+  - Konfirmasi pemilihan lokasi output dokumen Excel (default: `output/Laporan_<SiteName>_<Tanggal>.xlsx`).
+  - Mulai `ExcelGeneratorThread` di background.
+  - Perbarui progress bar dan label status secara berkala.
+- [ ] Tampilkan `ReportDialog` setelah selesai:
+  - Statistik foto yang berhasil disisipkan dan dilewati/gagal.
+  - Tombol aksi: "Buka Dokumen Excel" (`QDesktopServices.openUrl`) dan "Buka Folder Hasil".
+- [ ] Buat file test end-to-end `tests/test_e2e_excel_flow.py`.
+- [ ] Perbarui `README.md` dengan panduan penggunaan Tahap 2 (Document Control BTS).
+- [ ] Jalankan audit test suite lengkap:
+  ```bash
+  ./venv/bin/pytest -v
+  ```
+- [ ] Pastikan seluruh test lolos 100% dan aplikasi bebas bug.
+
+#### 🧪 Cara Verifikasi Sesi 12
+```bash
+./venv/bin/pytest -v
+./venv/bin/python -m src.main
+```
+
+#### 🤖 Prompt untuk AI Agent
+```text
+Halo Agent, tolong kerjakan SESI 12 dari file IMPLEMENTATION.md untuk proyek my-bts.
+
+Tugas yang harus diselesaikan:
+1. Hubungkan tombol Generate Dokumen Excel di main_window.py dengan ExcelGeneratorThread di background.
+2. Perbarui report_dialog.py dengan tombol pintasan untuk membuka dokumen Excel hasil secara langsung.
+3. Tulis pengujian integrasi end-to-end di tests/test_e2e_excel_flow.py.
+4. Perbarui README.md dengan dokumentasi alur kerja baru (Document Control BTS Telkom).
+5. Jalankan seluruh test suite pytest dan pastikan 100% lolos.
+6. Buat git commit:
+   git add .
+   git commit -m "feat(sesi-12): integrasi ekspor excel 1-klik, pelaporan hasil, dan verifikasi akhir tahap 2"
+7. Tandai checklist Sesi 12 dengan [x] di IMPLEMENTATION.md.
+```
+
+#### 💾 Perintah Git Commit
+```bash
+git add .
+git commit -m "feat(sesi-12): integrasi ekspor excel 1-klik, pelaporan hasil, dan verifikasi akhir tahap 2"
+```
+
+#### ✅ Kriteria Selesai (Definition of Done)
+1. Alur 1-klik ekspor dokumen Excel berjalan sempurna dari UI.
+2. File Excel yang dihasilkan memiliki foto-foto terpasang presisi di sheet dan sel yang tepat.
+3. Seluruh unit test dan e2e test lulus 100%.
+4. Dokumentasi README.md terbarui dan rapi.
