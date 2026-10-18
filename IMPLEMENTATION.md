@@ -172,11 +172,11 @@ Membangun "otak" aplikasi untuk validasi nama file Windows dan pembaca file TXT/
 - `tests/test_importer.py`
 
 #### 📋 Checklist Tugas Sesi 2
-- [ ] Buat modul `src/utils/file_utils.py`:
+- [x] Buat modul `src/utils/file_utils.py`:
   - Fungsi `sanitize_filename(name: str) -> str`
   - Fungsi `split_filename_and_ext(filename: str) -> tuple[str, str]`
   - Konstanta reserved device names Windows: `{"CON", "PRN", "AUX", "NUL", ...}`
-- [ ] Buat modul `src/core/validator.py`:
+- [x] Buat modul `src/core/validator.py`:
   - Dataclass/NamedTuple `ValidationResult(is_valid: bool, error_message: str)`
   - Fungsi `validate_single_filename(name: str) -> ValidationResult`
   - Fungsi `validate_batch(row_items: list[dict], output_dir: str, allow_overwrite: bool) -> tuple[bool, list[str]]`
@@ -185,10 +185,10 @@ Membangun "otak" aplikasi untuk validasi nama file Windows dan pembaca file TXT/
     - Cek apakah foto belum dipilih padahal nama target diisi.
     - Cek duplikasi nama target antar baris (case-insensitive untuk Windows).
     - Cek tabrakan file yang sudah ada di folder output (jika `allow_overwrite=False`).
-- [ ] Buat modul `src/core/importer.py`:
+- [x] Buat modul `src/core/importer.py`:
   - Fungsi `import_names_from_txt(file_path: str) -> list[str]` (abaikan baris kosong, strip whitespace).
   - Fungsi `import_names_from_csv(file_path: str, column_index: int = 0) -> list[str]` (dukung pemisah koma, titik koma, dan tab).
-- [ ] Buat unit test komprehensif di `tests/test_validator.py` dan `tests/test_importer.py`.
+- [x] Buat unit test komprehensif di `tests/test_validator.py` dan `tests/test_importer.py`.
 
 #### 🧪 Cara Verifikasi Sesi 2
 Jalankan pengujian otomatis di terminal:
