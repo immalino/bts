@@ -111,6 +111,39 @@ class TestModels:
         assert loaded.last_exported_at == "2026-10-18T10:00:00"
         assert loaded.photo_assignments["f2"] == "/photos/pic2.jpg"
 
+    def test_photo_field_config_text_type_and_roundtrip(self):
+        field = PhotoFieldConfig(
+            field_id="txt_site_id",
+            label="ID Site Telkom",
+            sheet_name="Site_Info",
+            cell_anchor="C3",
+            field_type="text",
+            default_text="JKT-001",
+        )
+        assert field.field_type == "text"
+        assert field.default_text == "JKT-001"
+
+        d = field.to_dict()
+        assert d["field_type"] == "text"
+        assert d["default_text"] == "JKT-001"
+
+        reconstructed = PhotoFieldConfig.from_dict(d)
+        assert reconstructed == field
+
+    def test_project_data_text_assignments_roundtrip(self):
+        project = ProjectData(
+            project_id="proj_text_test",
+            site_name="BDG-002",
+            template_id="tpl_text_std",
+            photo_assignments={"p1": "/photos/p1.jpg"},
+            text_assignments={"t1": "Teknisi: Ahmad", "t2": "Tinggi: 72M"},
+        )
+        d = project.to_dict()
+        assert d["text_assignments"] == {"t1": "Teknisi: Ahmad", "t2": "Tinggi: 72M"}
+
+        loaded = ProjectData.from_dict(d)
+        assert loaded.text_assignments == {"t1": "Teknisi: Ahmad", "t2": "Tinggi: 72M"}
+
 
 # =====================================================================
 # StorageManager Tests

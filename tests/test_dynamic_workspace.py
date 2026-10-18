@@ -17,7 +17,7 @@ from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
 from src.core.models import PhotoFieldConfig, ProjectData, TemplateConfig
 from src.core.storage import StorageManager
-from src.ui.dynamic_row import DynamicPhotoRow, DynamicRowStatus
+from src.ui.dynamic_row import DynamicPhotoRow, DynamicRowStatus, DynamicTextRow
 from src.ui.main_window import MainWindow
 from src.ui.project_dialog import NewProjectDialog, ProjectManagerDialog
 
@@ -327,4 +327,87 @@ def test_main_window_switch_project(qapp, tmp_path: Path, dummy_image_file: str)
     assert window.dynamic_rows[0].lbl_field_name.text() == "Foto Sektor A"
     assert window.dynamic_rows[1].lbl_field_name.text() == "Foto Sektor B"
     window.close()
+
+
+def test_dynamic_text_row_init_and_status(qapp):
+    """Verifikasi inisialisasi, input teks, dan pembaruan status pada DynamicTextRow."""
+    field_cfg = PhotoFieldConfig(
+        field_id="txt_lead",
+        label="Nama Teknisi Lead",
+        sheet_name="Site_Info",
+        cell_anchor="C3",
+        field_type="text",
+        default_text="Budi",
+    )
+
+    row = DynamicTextRow(field_config=field_cfg, row_index=1)
+    assert row.lbl_index.text() == "01"
+    assert row.lbl_field_name.text() == "Nama Teknisi Lead"
+    assert "Teks" in row.lbl_badge.text()
+    assert "Sheet: Site_Info" in row.lbl_badge.text()
+    assert "Sel: C3" in row.lbl_badge.text()
+    assert row.lbl_icon.text() == "TEKS"
+    assert row.lbl_status.text() == DynamicRowStatus.EMPTY
+
+    # Ketik / set teks
+    row.set_text("Ahmad Subarjo")
+    assert row.get_text() == "Ahmad Subarjo"
+    assert row.lbl_status.text() == DynamicRowStatus.FILLED
+
+    # Clear teks
+    row.clear_text()
+    assert row.get_text() == ""
+    assert row.lbl_status.text() == DynamicRowStatus.EMPTY
+
+    row.close()
+
+
+def test_main_window_mixed_workspace_and_auto_save(qapp, tmp_path: Path, dummy_image_file: str):
+    """Memverifikasi render workspace campuran (foto + teks) dan persistensi auto-save ke ProjectData."""
+    storage = StorageManager(base_dir=tmp_path / "mixed_storage")
+
+    t_mixed = TemplateConfig(
+        template_id="t_mixed",
+        name="Template Telkom Campuran",
+        template_file_path=str(tmp_path / "dummy.xlsx"),
+        fields=[
+            PhotoFieldConfig("p1", "Foto Antenna", "Antenna", "B5", field_type="photo"),
+            PhotoFieldConfig("t1", "Tinggi Tower", "Site_Info", "C2", field_type="text", default_text="72M"),
+        ],
+    )
+    storage.save_template(t_mixed)
+
+    proj = ProjectData("proj_mix", "Site Campuran", "t_mixed")
+    storage.save_project(proj)
+
+    window = MainWindow(storage=storage)
+    window.set_project(proj)
+
+    assert len(window.dynamic_rows) == 2
+    assert isinstance(window.dynamic_rows[0], DynamicPhotoRow)
+    assert isinstance(window.dynamic_rows[1], DynamicTextRow)
+
+    # Verifikasi default_text dimuat otomatis ke text row
+    assert window.dynamic_rows[1].get_text() == "72M"
+    assert window.dynamic_rows[1].lbl_status.text() == DynamicRowStatus.FILLED
+
+    # Pasang foto di row 0
+    window.dynamic_rows[0].set_photo(dummy_image_file)
+    assert proj.photo_assignments["p1"] == dummy_image_file
+
+    # Ubah teks di row 1
+    window.dynamic_rows[1].set_text("85 Meter High")
+
+    # Verifikasi tersimpan di memory dan di disk
+    assert window.current_project.text_assignments["t1"] == "85 Meter High"
+    reloaded = storage.load_project(proj.project_id)
+    assert reloaded.text_assignments.get("t1") == "85 Meter High"
+    assert reloaded.photo_assignments.get("p1") == dummy_image_file
+
+    # Verifikasi ringkasan stats
+    assert "Total: 2 field" in window.lbl_stats.text()
+    assert "Terisi: 2 / 2" in window.lbl_stats.text()
+
+    window.close()
+
 

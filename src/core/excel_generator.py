@@ -45,6 +45,7 @@ class ExcelGeneratorThread(QThread):
         template: Optional[Union[TemplateConfig, str]] = None,
         output_path: str = "",
         photo_assignments: Optional[Dict[str, str]] = None,
+        text_assignments: Optional[Dict[str, str]] = None,
         fields: Optional[List[PhotoFieldConfig]] = None,
         project_data: Optional[ProjectData] = None,
         parent: Optional[object] = None,
@@ -53,12 +54,15 @@ class ExcelGeneratorThread(QThread):
         self.output_path = output_path
         self.project_data = project_data
         self.photo_assignments = dict(photo_assignments or {})
+        self.text_assignments = dict(text_assignments or {})
         self._is_cancelled: bool = False
 
         # Inisialisasi dari project_data jika ada
         if self.project_data is not None:
             if not self.photo_assignments:
                 self.photo_assignments = dict(self.project_data.photo_assignments)
+            if not self.text_assignments:
+                self.text_assignments = dict(getattr(self.project_data, "text_assignments", {}))
             if not self.output_path and self.project_data.output_dir:
                 site_name = self.project_data.site_name.strip() or "BTS_Site"
                 self.output_path = os.path.join(
@@ -141,8 +145,11 @@ class ExcelGeneratorThread(QThread):
                     break
 
                 field_name = field.label or field.field_id
+                field_type = getattr(field, "field_type", "photo")
+
+                type_desc = "teks" if field_type == "text" else "foto"
                 self.progress_updated.emit(
-                    idx, total_steps, f"Memproses field foto '{field_name}'..."
+                    idx, total_steps, f"Memproses field {type_desc} '{field_name}'..."
                 )
 
                 # 1. Validasi sheet target pada workbook
@@ -158,7 +165,38 @@ class ExcelGeneratorThread(QThread):
 
                 ws = wb[field.sheet_name]
 
-                # 2. Periksa apakah foto di-assign
+                # 2. Penanganan jika field bertipe teks
+                if field_type == "text":
+                    text_val = self.text_assignments.get(field.field_id)
+                    if text_val is None or not str(text_val).strip():
+                        # Fallback ke default_text jika ada
+                        default_val = getattr(field, "default_text", "")
+                        if default_val:
+                            text_val = default_val
+
+                    if text_val is None or not str(text_val).strip():
+                        err_msg = f"Tidak ada teks yang diisi untuk field '{field_name}'"
+                        errors.append(err_msg)
+                        fail_count += 1
+                        self.item_finished.emit(field.field_id, False, err_msg)
+                        continue
+
+                    try:
+                        ws[field.cell_anchor].value = str(text_val)
+                        success_count += 1
+                        self.item_finished.emit(
+                            field.field_id,
+                            True,
+                            f"Teks berhasil ditulis ke {field.cell_anchor}",
+                        )
+                    except Exception as ex:
+                        err_msg = f"Gagal menulis teks ke '{field.cell_anchor}': {ex}"
+                        errors.append(err_msg)
+                        fail_count += 1
+                        self.item_finished.emit(field.field_id, False, err_msg)
+                    continue
+
+                # 3. Penanganan jika field bertipe foto: Periksa apakah foto di-assign
                 photo_path = self.photo_assignments.get(field.field_id)
                 if not photo_path or not str(photo_path).strip():
                     err_msg = f"Tidak ada foto yang di-assign untuk field '{field_name}'"

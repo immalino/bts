@@ -34,7 +34,7 @@ from src.core.importer import import_names_from_csv, import_names_from_txt
 from src.core.models import ProjectData, TemplateConfig
 from src.core.storage import StorageManager
 from src.core.validator import validate_batch
-from src.ui.dynamic_row import DynamicPhotoRow
+from src.ui.dynamic_row import DynamicPhotoRow, DynamicTextRow
 from src.ui.project_dialog import ProjectManagerDialog
 from src.ui.report_dialog import ReportDialog
 from src.ui.row_widget import RowStatus, RowWidget
@@ -419,25 +419,40 @@ class MainWindow(QMainWindow):
         project: Optional[ProjectData] = None,
     ) -> None:
         """
-        Me-render daftar DynamicPhotoRow pada ScrollArea sesuai daftar field foto template.
+        Me-render daftar DynamicPhotoRow dan DynamicTextRow pada ScrollArea sesuai daftar field template.
         """
         self.scroll_content.setUpdatesEnabled(False)
         self.clear_all_rows()
 
         for idx, fld in enumerate(template.fields, start=1):
-            row = DynamicPhotoRow(
-                field_config=fld,
-                row_index=idx,
-                parent=self.scroll_content,
-            )
-            # Jika ada foto yang sudah terpasang di project, pasang ke row
-            if project and fld.field_id in project.photo_assignments:
-                photo_path = project.photo_assignments[fld.field_id]
-                if photo_path and os.path.isfile(photo_path):
-                    row.set_photo(photo_path, emit_signal=False)
+            fld_type = getattr(fld, "field_type", "photo")
+            if fld_type == "text":
+                row = DynamicTextRow(
+                    field_config=fld,
+                    row_index=idx,
+                    parent=self.scroll_content,
+                )
+                if project and fld.field_id in project.text_assignments:
+                    row.set_text(project.text_assignments[fld.field_id], emit_signal=False)
+                elif getattr(fld, "default_text", ""):
+                    row.set_text(fld.default_text, emit_signal=False)
 
-            row.photo_changed.connect(self._on_dynamic_photo_changed)
-            row.data_changed.connect(self.update_summary_stats)
+                row.text_changed.connect(self._on_dynamic_text_changed)
+                row.data_changed.connect(self.update_summary_stats)
+            else:
+                row = DynamicPhotoRow(
+                    field_config=fld,
+                    row_index=idx,
+                    parent=self.scroll_content,
+                )
+                # Jika ada foto yang sudah terpasang di project, pasang ke row
+                if project and fld.field_id in project.photo_assignments:
+                    photo_path = project.photo_assignments[fld.field_id]
+                    if photo_path and os.path.isfile(photo_path):
+                        row.set_photo(photo_path, emit_signal=False)
+
+                row.photo_changed.connect(self._on_dynamic_photo_changed)
+                row.data_changed.connect(self.update_summary_stats)
 
             self.dynamic_rows.append(row)
             self.rows_layout.addWidget(row)
@@ -455,6 +470,20 @@ class MainWindow(QMainWindow):
                 self.current_project.photo_assignments[field_id] = photo_path
             else:
                 self.current_project.photo_assignments.pop(field_id, None)
+
+            self.storage.save_project(self.current_project)
+
+        self.update_summary_stats()
+
+    def _on_dynamic_text_changed(self, field_id: str, text_value: str) -> None:
+        """
+        Auto-save perubahan teks ke data proyek aktif dan persistensi ke storage.
+        """
+        if self.current_project:
+            if text_value:
+                self.current_project.text_assignments[field_id] = text_value
+            else:
+                self.current_project.text_assignments.pop(field_id, None)
 
             self.storage.save_project(self.current_project)
 
@@ -707,8 +736,23 @@ class MainWindow(QMainWindow):
         """Menghitung dan menampilkan statistik baris saat ini."""
         if self.dynamic_rows:
             total = len(self.dynamic_rows)
-            with_photos = len([r for r in self.dynamic_rows if r.get_photo()])
-            self.lbl_stats.setText(f"Total: {total} field | Foto Terisi: {with_photos} / {total}")
+            photo_rows = [r for r in self.dynamic_rows if getattr(r, "field_type", "photo") == "photo"]
+            text_rows = [r for r in self.dynamic_rows if getattr(r, "field_type", "photo") == "text"]
+
+            if not text_rows:
+                with_photos = len([r for r in photo_rows if r.get_photo()])
+                self.lbl_stats.setText(f"Total: {total} field | Foto Terisi: {with_photos} / {total}")
+            elif not photo_rows:
+                with_texts = len([r for r in text_rows if r.get_text()])
+                self.lbl_stats.setText(f"Total: {total} field | Teks Terisi: {with_texts} / {total}")
+            else:
+                photo_filled = len([r for r in photo_rows if r.get_photo()])
+                text_filled = len([r for r in text_rows if r.get_text()])
+                total_filled = photo_filled + text_filled
+                self.lbl_stats.setText(
+                    f"Total: {total} field | Terisi: {total_filled} / {total} "
+                    f"(Foto: {photo_filled}/{len(photo_rows)}, Teks: {text_filled}/{len(text_rows)})"
+                )
             return
 
         total = len(self.row_widgets)
@@ -766,18 +810,39 @@ class MainWindow(QMainWindow):
             )
             return
 
-        filled_assignments = {
+        filled_photo_assignments = {
             row.get_field_id(): row.get_photo()
             for row in self.dynamic_rows
-            if row.get_photo() and os.path.isfile(row.get_photo())
+            if getattr(row, "field_type", "photo") == "photo" and row.get_photo() and os.path.isfile(row.get_photo())
         }
-        if not filled_assignments:
-            QMessageBox.warning(
-                self,
-                "Foto Belum Dimasukkan",
-                "Belum ada foto yang dimasukkan pada baris template.\n"
-                "Silakan masukkan setidaknya satu foto sebelum melakukan generate dokumen Excel.",
-            )
+        filled_text_assignments = {
+            row.get_field_id(): row.get_text()
+            for row in self.dynamic_rows
+            if getattr(row, "field_type", "photo") == "text" and row.get_text().strip()
+        }
+
+        if not filled_photo_assignments and not filled_text_assignments:
+            has_photo_fields = any(getattr(r, "field_type", "photo") == "photo" for r in self.dynamic_rows)
+            has_text_fields = any(getattr(r, "field_type", "photo") == "text" for r in self.dynamic_rows)
+            if has_photo_fields and not has_text_fields:
+                title = "Foto Belum Dimasukkan"
+                msg = (
+                    "Belum ada foto yang dimasukkan pada baris template.\n"
+                    "Silakan masukkan setidaknya satu foto sebelum melakukan generate dokumen Excel."
+                )
+            elif has_text_fields and not has_photo_fields:
+                title = "Teks Belum Dimasukkan"
+                msg = (
+                    "Belum ada teks yang dimasukkan pada baris template.\n"
+                    "Silakan masukkan setidaknya satu teks sebelum melakukan generate dokumen Excel."
+                )
+            else:
+                title = "Data Belum Dimasukkan"
+                msg = (
+                    "Belum ada foto atau teks yang dimasukkan pada baris template.\n"
+                    "Silakan masukkan setidaknya satu foto atau teks sebelum melakukan generate dokumen Excel."
+                )
+            QMessageBox.warning(self, title, msg)
             return
 
         # Tentukan nama dan lokasi file output default
@@ -824,7 +889,8 @@ class MainWindow(QMainWindow):
         self.excel_generator_thread = ExcelGeneratorThread(
             template=self.current_template,
             output_path=output_file,
-            photo_assignments=filled_assignments,
+            photo_assignments=filled_photo_assignments,
+            text_assignments=filled_text_assignments,
             fields=[row.get_field_config() for row in self.dynamic_rows],
             project_data=self.current_project,
             parent=self,
@@ -1045,8 +1111,12 @@ class MainWindow(QMainWindow):
             row.btn_clear.setEnabled(not exporting)
 
         for row in self.dynamic_rows:
-            row.btn_select.setEnabled(not exporting)
-            row.btn_clear.setEnabled(not exporting)
+            if hasattr(row, "btn_select"):
+                row.btn_select.setEnabled(not exporting)
+            if hasattr(row, "edit_text"):
+                row.edit_text.setEnabled(not exporting)
+            if hasattr(row, "btn_clear"):
+                row.btn_clear.setEnabled(not exporting)
 
     def _on_export_progress(self, current_index: int, total: int, current_filename: str) -> None:
         """Memperbarui progress bar dan status label secara real-time."""

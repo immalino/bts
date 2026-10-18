@@ -68,10 +68,10 @@ class FieldEditDialog(QDialog):
         self._load_initial_data()
 
     def _init_ui(self) -> None:
-        title = "Edit Field Foto" if self.field_config else "Tambah Field Foto Baru"
+        title = "Edit Field" if self.field_config else "Tambah Field Baru"
         self.setWindowTitle(title)
-        self.resize(480, 470)
-        self.setMinimumSize(420, 420)
+        self.resize(500, 520)
+        self.setMinimumSize(440, 460)
         self.setModal(True)
 
         if APP_ICON_PNG.is_file():
@@ -93,7 +93,7 @@ class FieldEditDialog(QDialog):
         """)
         header_layout.addWidget(lbl_title)
 
-        lbl_subtitle = QLabel("Tentukan penempatan dan aturan ukuran foto pada sheet Excel", self)
+        lbl_subtitle = QLabel("Tentukan tipe field, penempatan pada sheet Excel, dan aturannya", self)
         lbl_subtitle.setStyleSheet(f"""
             font-size: 11px;
             color: {ThemeColors.TEXT_MUTED};
@@ -102,7 +102,7 @@ class FieldEditDialog(QDialog):
         layout.addLayout(header_layout)
 
         # Form Group
-        form_group = QGroupBox("Informasi Field Foto", self)
+        form_group = QGroupBox("Informasi Field", self)
         form_group.setStyleSheet(f"""
             QGroupBox {{
                 font-size: 12px;
@@ -123,10 +123,29 @@ class FieldEditDialog(QDialog):
         form_layout.setSpacing(10)
         form_layout.setContentsMargins(12, 12, 12, 12)
 
+        # 0. Tipe Field (Foto vs Teks)
+        lbl_type = QLabel("Tipe Field:", form_group)
+        lbl_type.setStyleSheet(f"font-weight: 600; color: {ThemeColors.TEXT}; font-size: 12px;")
+        form_layout.addWidget(lbl_type)
+
+        self.btn_group_type = QButtonGroup(self)
+        self.radio_type_photo = QRadioButton("Field Foto (Gambar / Kamera)", form_group)
+        self.radio_type_photo.setChecked(True)
+        self.radio_type_text = QRadioButton("Field Teks (Nilai String / Keterangan)", form_group)
+        self.btn_group_type.addButton(self.radio_type_photo)
+        self.btn_group_type.addButton(self.radio_type_text)
+
+        type_btn_layout = QHBoxLayout()
+        type_btn_layout.setSpacing(14)
+        type_btn_layout.addWidget(self.radio_type_photo)
+        type_btn_layout.addWidget(self.radio_type_text)
+        type_btn_layout.addStretch(1)
+        form_layout.addLayout(type_btn_layout)
+
         # 1. Label Field
-        lbl_field_label = QLabel("Label Field Foto:", form_group)
-        lbl_field_label.setStyleSheet(f"font-weight: 600; color: {ThemeColors.TEXT}; font-size: 12px;")
-        form_layout.addWidget(lbl_field_label)
+        self.lbl_field_label = QLabel("Label Field Foto:", form_group)
+        self.lbl_field_label.setStyleSheet(f"font-weight: 600; color: {ThemeColors.TEXT}; font-size: 12px;")
+        form_layout.addWidget(self.lbl_field_label)
 
         self.edit_label = QLineEdit(form_group)
         self.edit_label.setPlaceholderText("Contoh: Foto Antenna Sector 1")
@@ -163,20 +182,42 @@ class FieldEditDialog(QDialog):
 
         form_layout.addLayout(coord_layout)
 
-        # 3. Mode Ukuran Gambar
-        lbl_mode = QLabel("Mode Ukuran Gambar:", form_group)
+        # 3. Kontainer Opsi Khusus Teks
+        self.text_options_container = QWidget(form_group)
+        text_opt_layout = QVBoxLayout(self.text_options_container)
+        text_opt_layout.setContentsMargins(0, 4, 0, 4)
+        text_opt_layout.setSpacing(4)
+
+        lbl_def_text = QLabel("Teks Default (Opsional):", self.text_options_container)
+        lbl_def_text.setStyleSheet(f"font-weight: 600; color: {ThemeColors.TEXT}; font-size: 12px;")
+        text_opt_layout.addWidget(lbl_def_text)
+
+        self.edit_default_text = QLineEdit(self.text_options_container)
+        self.edit_default_text.setPlaceholderText("Contoh: Menara BTS 72M atau biarkan kosong...")
+        text_opt_layout.addWidget(self.edit_default_text)
+
+        self.text_options_container.setVisible(False)
+        form_layout.addWidget(self.text_options_container)
+
+        # 4. Kontainer Opsi Khusus Foto (Ukuran, Padding, Alignment)
+        self.photo_options_container = QWidget(form_group)
+        photo_opt_layout = QVBoxLayout(self.photo_options_container)
+        photo_opt_layout.setContentsMargins(0, 4, 0, 4)
+        photo_opt_layout.setSpacing(10)
+
+        lbl_mode = QLabel("Mode Ukuran Gambar:", self.photo_options_container)
         lbl_mode.setStyleSheet(f"font-weight: 600; color: {ThemeColors.TEXT}; font-size: 12px;")
-        form_layout.addWidget(lbl_mode)
+        photo_opt_layout.addWidget(lbl_mode)
 
         self.btn_group_mode = QButtonGroup(self)
-        self.radio_fit = QRadioButton("Auto-Fit ke Ukuran Sel (Rekomendasi)", form_group)
+        self.radio_fit = QRadioButton("Auto-Fit ke Ukuran Sel (Rekomendasi)", self.photo_options_container)
         self.radio_fit.setChecked(True)
-        self.radio_custom = QRadioButton("Ukuran Kustom (Lebar x Tinggi)", form_group)
+        self.radio_custom = QRadioButton("Ukuran Kustom (Lebar x Tinggi)", self.photo_options_container)
         self.btn_group_mode.addButton(self.radio_fit)
         self.btn_group_mode.addButton(self.radio_custom)
 
-        form_layout.addWidget(self.radio_fit)
-        form_layout.addWidget(self.radio_custom)
+        photo_opt_layout.addWidget(self.radio_fit)
+        photo_opt_layout.addWidget(self.radio_custom)
 
         # Dimensi Kustom
         custom_size_layout = QHBoxLayout()
@@ -184,10 +225,10 @@ class FieldEditDialog(QDialog):
 
         custom_w_layout = QVBoxLayout()
         custom_w_layout.setSpacing(2)
-        lbl_w = QLabel("Lebar (px):", form_group)
+        lbl_w = QLabel("Lebar (px):", self.photo_options_container)
         lbl_w.setStyleSheet(f"font-size: 11px; color: {ThemeColors.TEXT_MUTED};")
         custom_w_layout.addWidget(lbl_w)
-        self.spin_width = QSpinBox(form_group)
+        self.spin_width = QSpinBox(self.photo_options_container)
         self.spin_width.setRange(10, 5000)
         self.spin_width.setValue(400)
         self.spin_width.setEnabled(False)
@@ -196,10 +237,10 @@ class FieldEditDialog(QDialog):
 
         custom_h_layout = QVBoxLayout()
         custom_h_layout.setSpacing(2)
-        lbl_h = QLabel("Tinggi (px):", form_group)
+        lbl_h = QLabel("Tinggi (px):", self.photo_options_container)
         lbl_h.setStyleSheet(f"font-size: 11px; color: {ThemeColors.TEXT_MUTED};")
         custom_h_layout.addWidget(lbl_h)
-        self.spin_height = QSpinBox(form_group)
+        self.spin_height = QSpinBox(self.photo_options_container)
         self.spin_height.setRange(10, 5000)
         self.spin_height.setValue(300)
         self.spin_height.setEnabled(False)
@@ -209,26 +250,26 @@ class FieldEditDialog(QDialog):
         # Margin / Padding
         padding_layout = QVBoxLayout()
         padding_layout.setSpacing(2)
-        lbl_p = QLabel("Padding (px):", form_group)
+        lbl_p = QLabel("Padding (px):", self.photo_options_container)
         lbl_p.setStyleSheet(f"font-size: 11px; color: {ThemeColors.TEXT_MUTED};")
         padding_layout.addWidget(lbl_p)
-        self.spin_padding = QSpinBox(form_group)
+        self.spin_padding = QSpinBox(self.photo_options_container)
         self.spin_padding.setRange(0, 100)
         self.spin_padding.setValue(2)
         padding_layout.addWidget(self.spin_padding)
         custom_size_layout.addLayout(padding_layout)
 
-        form_layout.addLayout(custom_size_layout)
+        photo_opt_layout.addLayout(custom_size_layout)
 
-        # 4. Perataan Posisi (Alignment)
-        lbl_align = QLabel("Perataan Posisi Foto:", form_group)
+        # Perataan Posisi (Alignment)
+        lbl_align = QLabel("Perataan Posisi Foto:", self.photo_options_container)
         lbl_align.setStyleSheet(f"font-weight: 600; color: {ThemeColors.TEXT}; font-size: 12px; margin-top: 4px;")
-        form_layout.addWidget(lbl_align)
+        photo_opt_layout.addWidget(lbl_align)
 
         self.btn_group_align = QButtonGroup(self)
-        self.radio_align_center = QRadioButton("Tengah / Center (Rekomendasi)", form_group)
+        self.radio_align_center = QRadioButton("Tengah / Center (Rekomendasi)", self.photo_options_container)
         self.radio_align_center.setChecked(True)
-        self.radio_align_topleft = QRadioButton("Kiri-Atas / Top-Left", form_group)
+        self.radio_align_topleft = QRadioButton("Kiri-Atas / Top-Left", self.photo_options_container)
         self.btn_group_align.addButton(self.radio_align_center)
         self.btn_group_align.addButton(self.radio_align_topleft)
 
@@ -237,12 +278,14 @@ class FieldEditDialog(QDialog):
         align_btn_layout.addWidget(self.radio_align_center)
         align_btn_layout.addWidget(self.radio_align_topleft)
         align_btn_layout.addStretch(1)
-        form_layout.addLayout(align_btn_layout)
+        photo_opt_layout.addLayout(align_btn_layout)
 
+        form_layout.addWidget(self.photo_options_container)
         layout.addWidget(form_group)
 
-        # Connect radio signal
+        # Connect radio signals
         self.radio_custom.toggled.connect(self._on_mode_toggled)
+        self.radio_type_photo.toggled.connect(self._on_type_toggled)
 
         layout.addStretch(1)
 
@@ -267,6 +310,17 @@ class FieldEditDialog(QDialog):
 
         layout.addLayout(footer_layout)
 
+    def _on_type_toggled(self, checked: bool) -> None:
+        is_photo = self.radio_type_photo.isChecked()
+        self.photo_options_container.setVisible(is_photo)
+        self.text_options_container.setVisible(not is_photo)
+        if is_photo:
+            self.lbl_field_label.setText("Label Field Foto:")
+            self.edit_label.setPlaceholderText("Contoh: Foto Antenna Sector 1")
+        else:
+            self.lbl_field_label.setText("Label Field Teks:")
+            self.edit_label.setPlaceholderText("Contoh: Nama Site / Ketinggian Tower")
+
     def _on_mode_toggled(self, checked: bool) -> None:
         self.spin_width.setEnabled(checked)
         self.spin_height.setEnabled(checked)
@@ -284,6 +338,15 @@ class FieldEditDialog(QDialog):
             self.combo_sheet.setCurrentText(self.field_config.sheet_name)
 
         self.edit_cell.setText(self.field_config.cell_anchor)
+
+        fld_type = getattr(self.field_config, "field_type", "photo")
+        if fld_type == "text":
+            self.radio_type_text.setChecked(True)
+            self.edit_default_text.setText(getattr(self.field_config, "default_text", ""))
+            self._on_type_toggled(False)
+        else:
+            self.radio_type_photo.setChecked(True)
+            self._on_type_toggled(True)
 
         if self.field_config.sizing_mode == "custom":
             self.radio_custom.setChecked(True)
@@ -310,7 +373,7 @@ class FieldEditDialog(QDialog):
             QMessageBox.warning(
                 self,
                 "Validasi Gagal",
-                "Label field foto tidak boleh kosong.",
+                "Label field foto tidak boleh kosong." if self.radio_type_photo.isChecked() else "Label field teks tidak boleh kosong.",
             )
             self.edit_label.setFocus()
             return
@@ -334,11 +397,22 @@ class FieldEditDialog(QDialog):
             self.edit_cell.setFocus()
             return
 
-        sizing_mode = "custom" if self.radio_custom.isChecked() else "fit_to_cell"
-        custom_width = self.spin_width.value() if sizing_mode == "custom" else 0
-        custom_height = self.spin_height.value() if sizing_mode == "custom" else 0
-        padding = self.spin_padding.value()
-        alignment = "top-left" if self.radio_align_topleft.isChecked() else "center"
+        is_text = self.radio_type_text.isChecked()
+        field_type = "text" if is_text else "photo"
+        default_text = self.edit_default_text.text().strip() if is_text else ""
+
+        if is_text:
+            sizing_mode = "fit_to_cell"
+            custom_width = 0
+            custom_height = 0
+            padding = 0
+            alignment = "center"
+        else:
+            sizing_mode = "custom" if self.radio_custom.isChecked() else "fit_to_cell"
+            custom_width = self.spin_width.value() if sizing_mode == "custom" else 0
+            custom_height = self.spin_height.value() if sizing_mode == "custom" else 0
+            padding = self.spin_padding.value()
+            alignment = "top-left" if self.radio_align_topleft.isChecked() else "center"
 
         field_id = (
             self.field_config.field_id
@@ -351,11 +425,13 @@ class FieldEditDialog(QDialog):
             label=label,
             sheet_name=sheet_name,
             cell_anchor=cell_anchor,
+            field_type=field_type,
             sizing_mode=sizing_mode,
             custom_width=custom_width,
             custom_height=custom_height,
             padding=padding,
             alignment=alignment,
+            default_text=default_text,
         )
         self.accept()
 
@@ -493,9 +569,9 @@ class TemplateEditorDialog(QDialog):
         meta_layout.addLayout(file_layout)
         layout.addWidget(meta_card)
 
-        # 3. Photo Fields Section
+        # 3. Fields Section
         fields_header_layout = QHBoxLayout()
-        lbl_fields_title = QLabel("Daftar Field Foto", self)
+        lbl_fields_title = QLabel("Daftar Field", self)
         lbl_fields_title.setStyleSheet(f"""
             font-size: 13px;
             font-weight: 700;
@@ -545,13 +621,14 @@ class TemplateEditorDialog(QDialog):
 
         # Table Fields
         self.table_fields = QTableWidget(self)
-        self.table_fields.setColumnCount(7)
+        self.table_fields.setColumnCount(8)
         self.table_fields.setHorizontalHeaderLabels([
             "No",
-            "Label Field Foto",
+            "Label Field",
+            "Tipe",
             "Sheet Target",
             "Sel Anchor",
-            "Mode Ukuran",
+            "Mode Ukuran / Info",
             "Padding",
             "Posisi",
         ])
@@ -570,6 +647,7 @@ class TemplateEditorDialog(QDialog):
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
 
         layout.addWidget(self.table_fields, stretch=1)
 
@@ -663,35 +741,50 @@ class TemplateEditorDialog(QDialog):
             item_label = QTableWidgetItem(fld.label)
             self.table_fields.setItem(row_idx, 1, item_label)
 
-            # 2: Sheet
-            item_sheet = QTableWidgetItem(fld.sheet_name)
-            self.table_fields.setItem(row_idx, 2, item_sheet)
+            # 2: Tipe (Foto / Teks)
+            fld_type = getattr(fld, "field_type", "photo")
+            type_str = "Teks" if fld_type == "text" else "Foto"
+            item_type = QTableWidgetItem(type_str)
+            item_type.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table_fields.setItem(row_idx, 2, item_type)
 
-            # 3: Sel Anchor
+            # 3: Sheet
+            item_sheet = QTableWidgetItem(fld.sheet_name)
+            self.table_fields.setItem(row_idx, 3, item_sheet)
+
+            # 4: Sel Anchor
             item_cell = QTableWidgetItem(fld.cell_anchor)
             item_cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table_fields.setItem(row_idx, 3, item_cell)
+            self.table_fields.setItem(row_idx, 4, item_cell)
 
-            # 4: Mode Ukuran
-            if fld.sizing_mode == "custom":
-                mode_str = f"Kustom ({fld.custom_width}x{fld.custom_height})"
+            # 5: Mode Ukuran / Info
+            if fld_type == "text":
+                def_text = getattr(fld, "default_text", "")
+                mode_str = f"Teks (Default: {def_text})" if def_text else "Teks Sel"
             else:
-                mode_str = "Auto-Fit Sel"
+                if fld.sizing_mode == "custom":
+                    mode_str = f"Kustom ({fld.custom_width}x{fld.custom_height})"
+                else:
+                    mode_str = "Auto-Fit Sel"
             item_mode = QTableWidgetItem(mode_str)
             item_mode.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table_fields.setItem(row_idx, 4, item_mode)
+            self.table_fields.setItem(row_idx, 5, item_mode)
 
-            # 5: Padding
-            item_pad = QTableWidgetItem(f"{fld.padding} px")
+            # 6: Padding
+            pad_str = f"{fld.padding} px" if fld_type != "text" else "-"
+            item_pad = QTableWidgetItem(pad_str)
             item_pad.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table_fields.setItem(row_idx, 5, item_pad)
+            self.table_fields.setItem(row_idx, 6, item_pad)
 
-            # 6: Posisi
-            align_val = getattr(fld, "alignment", "center")
-            align_str = "Kiri-Atas" if align_val == "top-left" else "Tengah"
+            # 7: Posisi
+            if fld_type != "text":
+                align_val = getattr(fld, "alignment", "center")
+                align_str = "Kiri-Atas" if align_val == "top-left" else "Tengah"
+            else:
+                align_str = "-"
             item_align = QTableWidgetItem(align_str)
             item_align.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table_fields.setItem(row_idx, 6, item_align)
+            self.table_fields.setItem(row_idx, 7, item_align)
 
         self._on_field_selection_changed()
 
@@ -753,7 +846,7 @@ class TemplateEditorDialog(QDialog):
         reply = QMessageBox.question(
             self,
             "Konfirmasi Hapus Field",
-            f"Apakah Anda yakin ingin menghapus field foto '{target_fld.label}'?",
+            f"Apakah Anda yakin ingin menghapus field '{target_fld.label}'?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -792,7 +885,7 @@ class TemplateEditorDialog(QDialog):
         Validasi seluruh isian form:
         - Nama template tidak boleh kosong
         - File template harus valid dan ada
-        - Setidaknya ada 1 field foto
+        - Setidaknya ada 1 field (foto atau teks)
         - Seluruh field memiliki koordinat sel yang valid
         """
         name = self.edit_name.text().strip()
@@ -830,8 +923,8 @@ class TemplateEditorDialog(QDialog):
             QMessageBox.warning(
                 self,
                 "Validasi Gagal",
-                "Template harus memiliki setidaknya satu field foto.\n"
-                "Klik tombol 'Tambah Field' untuk menambahkan penempatan foto.",
+                "Template harus memiliki setidaknya satu field (foto atau teks).\n"
+                "Klik tombol 'Tambah Field' untuk menambahkan field.",
             )
             return False
 
@@ -840,7 +933,7 @@ class TemplateEditorDialog(QDialog):
                 QMessageBox.warning(
                     self,
                     "Validasi Gagal",
-                    f"Baris {idx + 1}: Label field foto tidak boleh kosong.",
+                    f"Baris {idx + 1}: Label field tidak boleh kosong.",
                 )
                 return False
 

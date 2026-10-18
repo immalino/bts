@@ -16,24 +16,28 @@ class PhotoFieldConfig:
     label: str
     sheet_name: str
     cell_anchor: str
+    field_type: str = "photo"  # "photo" | "text"
     sizing_mode: str = "fit_to_cell"  # "fit_to_cell" | "custom"
     custom_width: int = 0
     custom_height: int = 0
     padding: int = 2
     alignment: str = "center"  # "center" | "top-left"
+    default_text: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
-        """Konversi model konfigurasi field foto ke dictionary."""
+        """Konversi model konfigurasi field ke dictionary."""
         return {
             "field_id": self.field_id,
             "label": self.label,
             "sheet_name": self.sheet_name,
             "cell_anchor": self.cell_anchor,
+            "field_type": self.field_type,
             "sizing_mode": self.sizing_mode,
             "custom_width": self.custom_width,
             "custom_height": self.custom_height,
             "padding": self.padding,
             "alignment": self.alignment,
+            "default_text": self.default_text,
         }
 
     @classmethod
@@ -44,18 +48,20 @@ class PhotoFieldConfig:
             label=str(data.get("label", "")),
             sheet_name=str(data.get("sheet_name", "")),
             cell_anchor=str(data.get("cell_anchor", "")),
+            field_type=str(data.get("field_type", "photo")),
             sizing_mode=str(data.get("sizing_mode", "fit_to_cell")),
             custom_width=int(data.get("custom_width", 0)),
             custom_height=int(data.get("custom_height", 0)),
             padding=int(data.get("padding", 2)),
             alignment=str(data.get("alignment", "center")),
+            default_text=str(data.get("default_text", "")),
         )
 
 
 @dataclass
 class TemplateConfig:
     """
-    Konfigurasi template laporan Excel beserta aturan penempatan field foto.
+    Konfigurasi template laporan Excel beserta aturan penempatan field foto atau teks.
     """
     template_id: str
     name: str
@@ -103,12 +109,13 @@ class TemplateConfig:
 @dataclass
 class ProjectData:
     """
-    State data pengerjaan site yang mengasosiasikan foto dengan field template.
+    State data pengerjaan site yang mengasosiasikan foto dan teks dengan field template.
     """
     project_id: str
     site_name: str
     template_id: str
     photo_assignments: Dict[str, str] = field(default_factory=dict)
+    text_assignments: Dict[str, str] = field(default_factory=dict)
     output_dir: str = ""
     created_at: str = ""
     last_exported_at: Optional[str] = None
@@ -124,6 +131,7 @@ class ProjectData:
             "site_name": self.site_name,
             "template_id": self.template_id,
             "photo_assignments": dict(self.photo_assignments),
+            "text_assignments": dict(self.text_assignments),
             "output_dir": self.output_dir,
             "created_at": self.created_at,
             "last_exported_at": self.last_exported_at,
@@ -138,6 +146,7 @@ class ProjectData:
             site_name=str(data.get("site_name", "")),
             template_id=str(data.get("template_id", "")),
             photo_assignments=dict(data.get("photo_assignments", {})),
+            text_assignments=dict(data.get("text_assignments", {})),
             output_dir=str(data.get("output_dir", "")),
             created_at=str(data.get("created_at", "")),
             last_exported_at=str(last_exp) if last_exp is not None else None,

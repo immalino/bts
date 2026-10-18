@@ -465,3 +465,60 @@ def test_template_manager_dialog_workflow(qapp, sample_xlsx: str, tmp_path: Path
 
     manager.close()
 
+
+def test_field_edit_dialog_text_type_flow(qapp):
+    """Memverifikasi pembuatan dan pengeditan field tipe teks di FieldEditDialog."""
+    dlg = FieldEditDialog(available_sheets=["Site_Info", "Antenna"])
+    assert dlg.radio_type_photo.isChecked() is True
+    assert dlg.text_options_container.isHidden() is True
+
+    # Pilih tipe teks
+    dlg.radio_type_text.setChecked(True)
+    assert dlg.photo_options_container.isHidden() is True
+    assert dlg.text_options_container.isHidden() is False
+    assert dlg.lbl_field_label.text() == "Label Field Teks:"
+
+    dlg.edit_label.setText("Nama Teknisi Lead")
+    dlg.combo_sheet.setCurrentText("Site_Info")
+    dlg.edit_cell.setText("C2")
+    dlg.edit_default_text.setText("Budi Santoso")
+
+    dlg._on_save_clicked()
+    res = dlg.get_field_config()
+    assert res is not None
+    assert res.label == "Nama Teknisi Lead"
+    assert res.field_type == "text"
+    assert res.sheet_name == "Site_Info"
+    assert res.cell_anchor == "C2"
+    assert res.default_text == "Budi Santoso"
+    dlg.close()
+
+
+def test_template_editor_mixed_fields_table(qapp, sample_xlsx: str):
+    """Memverifikasi tampilan tabel field di TemplateEditorDialog dengan tipe campuran Foto dan Teks."""
+    editor = TemplateEditorDialog()
+    editor.set_template_file(sample_xlsx)
+
+    editor.fields = [
+        PhotoFieldConfig("f1", "Foto Antenna 1", "Antenna", "B5", field_type="photo"),
+        PhotoFieldConfig("t1", "Nama Site BTS", "Antenna", "A1", field_type="text", default_text="Site-JKT"),
+    ]
+    editor._refresh_fields_table()
+
+    assert editor.table_fields.rowCount() == 2
+    # Baris 0: Foto
+    assert editor.table_fields.item(0, 1).text() == "Foto Antenna 1"
+    assert editor.table_fields.item(0, 2).text() == "Foto"
+    assert editor.table_fields.item(0, 5).text() == "Auto-Fit Sel"
+    assert editor.table_fields.item(0, 6).text() == "2 px"
+
+    # Baris 1: Teks
+    assert editor.table_fields.item(1, 1).text() == "Nama Site BTS"
+    assert editor.table_fields.item(1, 2).text() == "Teks"
+    assert "Teks (Default: Site-JKT)" in editor.table_fields.item(1, 5).text()
+    assert editor.table_fields.item(1, 6).text() == "-"
+    assert editor.table_fields.item(1, 7).text() == "-"
+
+    editor.close()
+
+

@@ -601,3 +601,63 @@ class TestExcelGeneratorThread:
             with Image.open(io.BytesIO(raw_bytes)) as embedded_img:
                 assert embedded_img.size == (1600, 1200)
 
+    def test_excel_generator_with_text_fields(
+        self,
+        dummy_template_path: str,
+        sample_photos: dict,
+        tmp_path: Path,
+    ):
+        """Memverifikasi penulisan nilai field bertipe teks ke dalam sel Excel target."""
+        output_file = str(tmp_path / "output_with_text.xlsx")
+
+        field_photo = PhotoFieldConfig(
+            field_id="f_ant",
+            label="Foto Antena",
+            sheet_name="Antenna",
+            cell_anchor="B5",
+            field_type="photo",
+        )
+        field_text1 = PhotoFieldConfig(
+            field_id="t_site_name",
+            label="Nama Site",
+            sheet_name="Equipment",
+            cell_anchor="A1",
+            field_type="text",
+        )
+        field_text2 = PhotoFieldConfig(
+            field_id="t_def",
+            label="Catatan Default",
+            sheet_name="Tower",
+            cell_anchor="A1",
+            field_type="text",
+            default_text="Default Tower Note",
+        )
+
+        completed_data = {}
+
+        def on_completed(path, success, fail, errors):
+            completed_data["path"] = path
+            completed_data["success"] = success
+            completed_data["fail"] = fail
+            completed_data["errors"] = errors
+
+        thread = ExcelGeneratorThread(
+            template=dummy_template_path,
+            output_path=output_file,
+            fields=[field_photo, field_text1, field_text2],
+            photo_assignments={"f_ant": sample_photos["p1"]},
+            text_assignments={"t_site_name": "JKT-KUNINGAN-001"},
+        )
+        thread.generation_completed.connect(on_completed)
+        thread.run()
+
+        assert os.path.exists(output_file)
+        assert completed_data["success"] == 3
+        assert completed_data["fail"] == 0
+
+        # Verifikasi hasil isi file Excel
+        wb = openpyxl.load_workbook(output_file)
+        assert wb["Equipment"]["A1"].value == "JKT-KUNINGAN-001"
+        assert wb["Tower"]["A1"].value == "Default Tower Note"
+        assert len(wb["Antenna"]._images) == 1
+

@@ -313,3 +313,69 @@ def test_e2e_excel_cancellation(
     assert not os.path.exists(out_file)
     window.close()
 
+
+def test_e2e_mixed_photo_and_text_excel_generation(
+    qapp,
+    dummy_excel_template: str,
+    dummy_photos: tuple[str, str],
+    tmp_path: Path,
+    monkeypatch,
+):
+    """
+    Skenario E2E 5: Alur Lengkap Dokumen Template Campuran Foto dan Teks ke Excel.
+    """
+    storage = StorageManager(base_dir=tmp_path / "storage_mixed_e2e")
+    photo1, _ = dummy_photos
+
+    fields = [
+        PhotoFieldConfig("f_ant", "Foto Antenna Sector 1", "Antenna", "B5", field_type="photo"),
+        PhotoFieldConfig("t_site", "Nama Site BTS", "Antenna", "A1", field_type="text"),
+        PhotoFieldConfig("t_eng", "Nama Engineer", "Equipment", "B2", field_type="text", default_text="Budi (Lead)"),
+    ]
+    template = TemplateConfig(
+        template_id="tpl_mixed_e2e",
+        name="Template Telkom Foto & Teks",
+        template_file_path=dummy_excel_template,
+        fields=fields,
+    )
+    storage.save_template(template)
+
+    project = ProjectData("p_mixed_e2e", "JKT-042 Pasar Minggu", "tpl_mixed_e2e")
+    storage.save_project(project)
+
+    window = MainWindow(storage=storage)
+    window.set_project(project)
+
+    # 1. Pasang foto ke field foto
+    window.dynamic_rows[0].set_photo(photo1)
+    # 2. Ketik teks ke field teks
+    window.dynamic_rows[1].set_text("PASAR-MINGGU-042")
+    # 3. Field teks ke-3 dibiarkan default ("Budi (Lead)")
+
+    out_file = str(tmp_path / "output_mixed_final.xlsx")
+    monkeypatch.setattr(
+        QFileDialog,
+        "getSaveFileName",
+        lambda *args, **kwargs: (out_file, "Excel Spreadsheet (*.xlsx)"),
+    )
+
+    # Mock ReportDialog exec agar test tidak terblokir
+    monkeypatch.setattr(ReportDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
+
+    # Eksekusi ekspor
+    window.start_export()
+    assert window.excel_generator_thread is not None
+    window.excel_generator_thread.wait(5000)
+    QCoreApplication.processEvents()
+
+    assert os.path.exists(out_file)
+
+    # Buka workbook dan verifikasi bahwa teks dan gambar berhasil disematkan
+    wb = openpyxl.load_workbook(out_file)
+    assert wb["Antenna"]["A1"].value == "PASAR-MINGGU-042"
+    assert wb["Equipment"]["B2"].value == "Budi (Lead)"
+    assert len(wb["Antenna"]._images) == 1
+
+    window.close()
+
+
