@@ -1083,3 +1083,4 @@ class TemplateManagerDialog(QDialog):
     def get_selected_template(self) -> Optional[TemplateConfig]:
         """Mengambil template yang dipilih pengguna untuk diaktifkan."""
         return self.selected_template
+

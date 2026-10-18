@@ -891,17 +891,17 @@ Membangun sistem manajemen proyek/site (buat proyek site baru, buka riwayat site
 - `tests/test_dynamic_workspace.py` (pengujian integrasi project & workspace)
 
 #### 📋 Checklist Tugas Sesi 11
-- [ ] Buat `src/ui/dynamic_row.py`:
+- [x] Buat `src/ui/dynamic_row.py`:
   - Menampilkan: Nomor urut, Nama Field Foto (teks tebal), Badge Info ("Sheet: Antenna | Sel: B5"), Thumbnail foto, DropZone (drag-and-drop & klik pilih), Tombol Hapus Foto, dan Status (Kosong / Terisi).
-- [ ] Buat `src/ui/project_dialog.py`:
+- [x] Buat `src/ui/project_dialog.py`:
   - Dialog pemilihan proyek site: Daftar site tersimpan, tombol "Proyek Site Baru" (input Nama/ID Site, pilih Template), tombol "Buka Site", tombol "Hapus Site".
-- [ ] Perbarui `src/ui/main_window.py`:
+- [x] Perbarui `src/ui/main_window.py`:
   - Header: Menampilkan informasi Site aktif dan Template aktif yang sedang digunakan.
   - Toolbar: Tombol "Ganti/Pilih Site", Tombol "Kelola Template".
   - Scroll Area: Me-render daftar `DynamicPhotoRow` sesuai field pada template aktif.
   - Auto-save perubahan foto ke `ProjectData` aktif.
-- [ ] Tulis pengujian di `tests/test_dynamic_workspace.py`.
-- [ ] Jalankan `pytest tests/test_dynamic_workspace.py` dan pastikan 100% PASSED.
+- [x] Tulis pengujian di `tests/test_dynamic_workspace.py`.
+- [x] Jalankan `pytest tests/test_dynamic_workspace.py` dan pastikan 100% PASSED.
 
 #### 🧪 Cara Verifikasi Sesi 11
 ```bash

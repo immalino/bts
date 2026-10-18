@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QCheckBox,
+    QDialog,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QStyle,
     QVBoxLayout,
     QWidget,
 )
@@ -27,9 +29,14 @@ from PySide6.QtWidgets import (
 from src.config import APP_ICON_ICO, APP_ICON_PNG, DEFAULT_ROW_COUNT, ThemeColors
 from src.core.exporter import ExportTask, ExporterThread
 from src.core.importer import import_names_from_csv, import_names_from_txt
+from src.core.models import ProjectData, TemplateConfig
+from src.core.storage import StorageManager
 from src.core.validator import validate_batch
+from src.ui.dynamic_row import DynamicPhotoRow
+from src.ui.project_dialog import ProjectManagerDialog
 from src.ui.report_dialog import ReportDialog
 from src.ui.row_widget import RowStatus, RowWidget
+from src.ui.template_dialog import TemplateManagerDialog
 from src.utils.file_utils import split_filename_and_ext
 
 
@@ -38,14 +45,22 @@ class MainWindow(QMainWindow):
     Jendela Utama Aplikasi Photo Rename Studio.
     
     Fitur Utama:
-    - Header aplikasi dengan panduan ringkas.
-    - Toolbar aksi: Impor Nama (TXT/CSV), Tambah Baris, Hapus Baris Kosong, Reset.
-    - Area tengah: QScrollArea vertikal dengan 100 baris RowWidget secara default.
+    - Header aplikasi: Informasi Site aktif dan Template aktif yang sedang digunakan.
+    - Toolbar aksi: Ganti/Pilih Site, Kelola Template, Impor Nama (TXT/CSV), Tambah Baris, Hapus Baris Kosong, Reset.
+    - Area tengah: QScrollArea vertikal dengan DynamicPhotoRow dinamis atau 100 baris RowWidget secara default.
     - Panel bawah: Pemilihan Folder Output, opsi Checkbox Overwrite, Progress Bar, Status, dan Tombol Ekspor.
     """
 
-    def __init__(self, default_rows: int = DEFAULT_ROW_COUNT):
+    def __init__(
+        self,
+        default_rows: int = DEFAULT_ROW_COUNT,
+        storage: Optional[StorageManager] = None,
+    ):
         super().__init__()
+        self.storage: StorageManager = storage or StorageManager()
+        self.current_project: Optional[ProjectData] = None
+        self.current_template: Optional[TemplateConfig] = None
+        self.dynamic_rows: List[DynamicPhotoRow] = []
         self.default_rows_count: int = default_rows
         self.row_widgets: List[RowWidget] = []
         self.exporter_thread: Optional[ExporterThread] = None
@@ -87,25 +102,57 @@ class MainWindow(QMainWindow):
         self._create_footer_section()
 
     def _create_header_section(self) -> None:
-        """Membuat bagian header dengan judul dan panduan ringkas."""
+        """Membuat bagian header dengan judul, info site & template aktif, dan panduan ringkas."""
         header_card = QFrame(self)
         header_card.setObjectName("HeaderCard")
         header_layout = QVBoxLayout(header_card)
         header_layout.setContentsMargins(16, 12, 16, 12)
-        header_layout.setSpacing(4)
+        header_layout.setSpacing(6)
 
-        title_label = QLabel("📷 Photo Rename Studio", header_card)
+        # Baris Header: Judul & Status Badge Site/Template
+        header_top_layout = QHBoxLayout()
+        header_top_layout.setSpacing(10)
+
+        title_label = QLabel("Photo Rename Studio", header_card)
         title_label.setStyleSheet(f"""
             font-size: 18px;
             font-weight: 700;
             color: {ThemeColors.TEXT};
         """)
-        header_layout.addWidget(title_label)
+        header_top_layout.addWidget(title_label)
+        header_top_layout.addStretch(1)
+
+        # Badge Site Aktif
+        self.lbl_active_site = QLabel("Site: (Belum dipilih)", header_card)
+        self.lbl_active_site.setStyleSheet(f"""
+            background-color: #EFF6FF;
+            color: {ThemeColors.PRIMARY};
+            border: 1px solid #BFDBFE;
+            border-radius: 4px;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: 600;
+        """)
+        header_top_layout.addWidget(self.lbl_active_site)
+
+        # Badge Template Aktif
+        self.lbl_active_template = QLabel("Template: (Belum dipilih)", header_card)
+        self.lbl_active_template.setStyleSheet(f"""
+            background-color: #F8FAFC;
+            color: {ThemeColors.TEXT_MUTED};
+            border: 1px solid {ThemeColors.BORDER};
+            border-radius: 4px;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: 600;
+        """)
+        header_top_layout.addWidget(self.lbl_active_template)
+        header_layout.addLayout(header_top_layout)
 
         guide_label = QLabel(
-            "Panduan Cepat: 1. Impor atau isi nama tujuan baris  •  "
-            "2. Tarik & lepas foto ke baris yang sesuai  •  "
-            "3. Tentukan folder output & siap ekspor.",
+            "Alur Dokumen BTS: 1. Pilih/Buat Proyek Site  •  "
+            "2. Tarik & lepas foto ke field template aktif (auto-save)  •  "
+            "3. Generate dokumen laporan Excel.",
             header_card,
         )
         guide_label.setStyleSheet(f"""
@@ -124,28 +171,53 @@ class MainWindow(QMainWindow):
         toolbar_layout.setContentsMargins(14, 10, 14, 10)
         toolbar_layout.setSpacing(10)
 
+        # Tombol Ganti / Pilih Site
+        self.btn_select_site = QPushButton("Ganti / Pilih Site", toolbar_card)
+        self.btn_select_site.setObjectName("PrimaryButton")
+        self.btn_select_site.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DesktopIcon))
+        self.btn_select_site.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_select_site.setToolTip("Pilih proyek site yang aktif atau buat proyek site baru")
+        toolbar_layout.addWidget(self.btn_select_site)
+
+        # Tombol Kelola Template
+        self.btn_manage_template = QPushButton("Kelola Template", toolbar_card)
+        self.btn_manage_template.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        self.btn_manage_template.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_manage_template.setToolTip("Buka dialog manajemen template laporan Excel")
+        toolbar_layout.addWidget(self.btn_manage_template)
+
+        # Separator visual
+        sep = QFrame(toolbar_card)
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+        sep.setStyleSheet(f"color: {ThemeColors.BORDER};")
+        toolbar_layout.addWidget(sep)
+
         # Tombol Impor
-        self.btn_import = QPushButton("📂 Impor Nama (TXT/CSV)", toolbar_card)
-        self.btn_import.setObjectName("PrimaryButton")
+        self.btn_import = QPushButton("Impor Nama (TXT/CSV)", toolbar_card)
+        self.btn_import.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton))
         self.btn_import.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_import.setToolTip("Impor daftar nama dari file .txt atau .csv")
         toolbar_layout.addWidget(self.btn_import)
 
         # Tombol Tambah Baris
-        self.btn_add_row = QPushButton("➕ Tambah Baris", toolbar_card)
+        self.btn_add_row = QPushButton("Tambah Baris", toolbar_card)
+        self.btn_add_row.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogNewFolder))
         self.btn_add_row.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_add_row.setToolTip("Tambahkan 1 baris baru di posisi paling bawah")
         toolbar_layout.addWidget(self.btn_add_row)
 
         # Tombol Hapus Baris Kosong
-        self.btn_remove_empty = QPushButton("➖ Hapus Baris Kosong", toolbar_card)
+        self.btn_remove_empty = QPushButton("Hapus Baris Kosong", toolbar_card)
+        self.btn_remove_empty.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
         self.btn_remove_empty.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_remove_empty.setToolTip("Hapus semua baris yang tidak memiliki foto dan nama")
         toolbar_layout.addWidget(self.btn_remove_empty)
 
         # Tombol Reset
-        self.btn_reset = QPushButton("🔄 Reset Semua", toolbar_card)
+        self.btn_reset = QPushButton("Reset Semua", toolbar_card)
         self.btn_reset.setObjectName("DangerButton")
+        self.btn_reset.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
         self.btn_reset.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_reset.setToolTip("Kembalikan semua baris dan pengaturan ke kondisi awal")
         toolbar_layout.addWidget(self.btn_reset)
@@ -262,6 +334,8 @@ class MainWindow(QMainWindow):
 
     def _setup_connections(self) -> None:
         """Menghubungkan sinyal aksi tombol ke method penangan."""
+        self.btn_select_site.clicked.connect(self.open_project_manager)
+        self.btn_manage_template.clicked.connect(self.open_template_manager)
         self.btn_import.clicked.connect(self.on_import_clicked)
         self.btn_add_row.clicked.connect(self.on_add_row_clicked)
         self.btn_remove_empty.clicked.connect(self.on_remove_empty_clicked)
@@ -270,6 +344,115 @@ class MainWindow(QMainWindow):
         self.btn_export.clicked.connect(self.start_export)
         self.btn_cancel_export.clicked.connect(self.cancel_export)
 
+
+    # =========================================================================
+    # Manajemen Proyek & Dynamic Photo Workspace (Sesi 11)
+    # =========================================================================
+
+    def _update_header_info(self) -> None:
+        """Memperbarui informasi site dan template aktif di header."""
+        site_name = self.current_project.site_name if self.current_project else "(Belum dipilih)"
+        self.lbl_active_site.setText(f"Site: {site_name}")
+
+        template_name = self.current_template.name if self.current_template else "(Belum dipilih)"
+        self.lbl_active_template.setText(f"Template: {template_name}")
+
+    def open_project_manager(self) -> None:
+        """Membuka dialog ProjectManagerDialog untuk memilih atau membuat site baru."""
+        dlg = ProjectManagerDialog(storage=self.storage, parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            project = dlg.get_selected_project()
+            if project:
+                self.set_project(project)
+
+    def open_template_manager(self) -> None:
+        """Membuka dialog TemplateManagerDialog untuk mengelola template Excel."""
+        dlg = TemplateManagerDialog(storage=self.storage, parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            template = dlg.get_selected_template()
+            if template:
+                self.set_template(template)
+
+    def set_project(self, project: ProjectData) -> None:
+        """
+        Menyetel proyek site aktif, memuat template terkait, dan me-render workspace dinamis.
+        """
+        self.current_project = project
+        try:
+            self.current_template = self.storage.load_template(project.template_id)
+        except Exception:
+            self.current_template = None
+
+        self._update_header_info()
+
+        if self.current_template:
+            self.render_dynamic_workspace(self.current_template, self.current_project)
+        else:
+            QMessageBox.warning(
+                self,
+                "Template Tidak Ditemukan",
+                f"Template ID '{project.template_id}' tidak ditemukan di penyimpanan.\n"
+                "Silakan pilih atau buat template melalui tombol 'Kelola Template'.",
+            )
+
+    def set_template(self, template: TemplateConfig) -> None:
+        """
+        Menyetel template aktif dan me-render workspace dinamis.
+        """
+        self.current_template = template
+        if self.current_project:
+            self.current_project.template_id = template.template_id
+            self.storage.save_project(self.current_project)
+
+        self._update_header_info()
+        self.render_dynamic_workspace(template, self.current_project)
+
+    def render_dynamic_workspace(
+        self,
+        template: TemplateConfig,
+        project: Optional[ProjectData] = None,
+    ) -> None:
+        """
+        Me-render daftar DynamicPhotoRow pada ScrollArea sesuai daftar field foto template.
+        """
+        self.scroll_content.setUpdatesEnabled(False)
+        self.clear_all_rows()
+
+        for idx, fld in enumerate(template.fields, start=1):
+            row = DynamicPhotoRow(
+                field_config=fld,
+                row_index=idx,
+                parent=self.scroll_content,
+            )
+            # Jika ada foto yang sudah terpasang di project, pasang ke row
+            if project and fld.field_id in project.photo_assignments:
+                photo_path = project.photo_assignments[fld.field_id]
+                if photo_path and os.path.isfile(photo_path):
+                    row.set_photo(photo_path, emit_signal=False)
+
+            row.photo_changed.connect(self._on_dynamic_photo_changed)
+            row.data_changed.connect(self.update_summary_stats)
+
+            self.dynamic_rows.append(row)
+            self.rows_layout.addWidget(row)
+
+        self.rows_layout.addStretch()
+        self.scroll_content.setUpdatesEnabled(True)
+        self.update_summary_stats()
+
+    def _on_dynamic_photo_changed(self, field_id: str, photo_path: str) -> None:
+        """
+        Auto-save perubahan foto ke data proyek aktif dan persistensi ke storage.
+        """
+        if self.current_project:
+            if photo_path:
+                self.current_project.photo_assignments[field_id] = photo_path
+            else:
+                self.current_project.photo_assignments.pop(field_id, None)
+
+            self.storage.save_project(self.current_project)
+
+        self.update_summary_stats()
 
     # =========================================================================
     # Manajemen Baris (Row Management)
@@ -297,6 +480,12 @@ class MainWindow(QMainWindow):
             row.setParent(None)
             row.deleteLater()
         self.row_widgets.clear()
+
+        for row in self.dynamic_rows:
+            self.rows_layout.removeWidget(row)
+            row.setParent(None)
+            row.deleteLater()
+        self.dynamic_rows.clear()
 
         # Bersihkan item stretch yang tersisa di layout
         while self.rows_layout.count() > 0:
@@ -393,6 +582,9 @@ class MainWindow(QMainWindow):
             font-weight: 500;
             color: {ThemeColors.TEXT_MUTED};
         """)
+        self.current_project = None
+        self.current_template = None
+        self._update_header_info()
         self.init_rows(self.default_rows_count)
 
 
@@ -507,6 +699,12 @@ class MainWindow(QMainWindow):
 
     def update_summary_stats(self) -> None:
         """Menghitung dan menampilkan statistik baris saat ini."""
+        if self.dynamic_rows:
+            total = len(self.dynamic_rows)
+            with_photos = len([r for r in self.dynamic_rows if r.get_photo()])
+            self.lbl_stats.setText(f"Total: {total} field | Foto Terisi: {with_photos} / {total}")
+            return
+
         total = len(self.row_widgets)
         with_photos = 0
         ready_count = 0

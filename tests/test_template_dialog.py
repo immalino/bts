@@ -461,3 +461,4 @@ def test_template_manager_dialog_workflow(qapp, sample_xlsx: str, tmp_path: Path
     assert manager.table_templates.item(0, 0).text() == "Template Beta"
 
     manager.close()
+
