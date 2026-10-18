@@ -244,18 +244,18 @@ Membuat mekanisme penyalinan file foto yang aman dengan `QThread` agar antarmuka
 - `tests/test_exporter.py`
 
 #### 📋 Checklist Tugas Sesi 3
-- [ ] Buat `src/core/image_loader.py`:
+- [x] Buat `src/core/image_loader.py`:
   - Fungsi `create_thumbnail(image_path: str, size: tuple = (64, 64)) -> QPixmap | None`
   - Penanganan orientasi EXIF foto kamera (agar foto tidak terputar 90 derajat secara salah).
   - Penanganan fallback aman jika file gambar rusak/korup.
-- [ ] Buat data model item ekspor `ExportTask(source_path: str, target_filename: str, row_index: int)`.
-- [ ] Buat worker class `src/core/exporter.py` turunan dari `QThread`:
+- [x] Buat data model item ekspor `ExportTask(source_path: str, target_filename: str, row_index: int)`.
+- [x] Buat worker class `src/core/exporter.py` turunan dari `QThread`:
   - Signal `progress_updated(current_index: int, total: int, current_filename: str)`
   - Signal `item_finished(row_index: int, success: bool, message: str)`
   - Signal `export_completed(success_count: int, fail_count: int, skipped_count: int, errors: list)`
   - Method `run()` yang mengeksekusi penyalinan foto satu per satu dengan `shutil.copy2`.
   - Fitur pembatalan (*cancellation flag*) dengan method `cancel()`.
-- [ ] Buat unit test di `tests/test_exporter.py`:
+- [x] Buat unit test di `tests/test_exporter.py`:
   - Pastikan file asli tetap utuh setelah ekspor (hash MD5/SHA256 sama persis sebelum dan sesudah ekspor).
   - Pastikan file tujuan berhasil dibuat dengan nama baru dan ekstensi asli yang benar.
   - Uji penanganan overwrite (`allow_overwrite=True` vs `allow_overwrite=False`).
