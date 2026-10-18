@@ -25,15 +25,6 @@ from src.ui.main_window import MainWindow
 from src.ui.report_dialog import ReportDialog
 
 
-@pytest.fixture(scope="session")
-def qapp():
-    """Fixture QApplication instance."""
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
-
-
 @pytest.fixture
 def dummy_excel_template(tmp_path: Path) -> str:
     """Fixture membuat file template Excel nyata dengan beberapa sheet."""
@@ -176,7 +167,7 @@ def test_e2e_excel_generation_full_success(
     monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened_urls.append(url))
     report._on_open_excel_clicked()
     assert len(opened_urls) == 1
-    assert out_file in opened_urls[0].toLocalFile()
+    assert os.path.normpath(out_file) == os.path.normpath(opened_urls[0].toLocalFile())
 
     # 4. Verifikasi update last_exported_at pada data project
     reloaded_proj = storage.load_project(project.project_id)
