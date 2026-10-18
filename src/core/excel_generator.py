@@ -318,6 +318,11 @@ class ExcelGeneratorThread(QThread):
                 err_msg = f"Gagal menyimpan file Excel ke '{self.output_path}': {ex}"
                 errors.append(err_msg)
                 fail_count += 1
+            finally:
+                try:
+                    wb.close()
+                except Exception:
+                    pass
 
         self.generation_completed.emit(self.output_path, success_count, fail_count, errors)
 

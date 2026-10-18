@@ -22,15 +22,6 @@ from src.ui.main_window import MainWindow
 from src.ui.project_dialog import NewProjectDialog, ProjectManagerDialog
 
 
-@pytest.fixture(scope="session")
-def qapp():
-    """Fixture QApplication instance."""
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
-
-
 @pytest.fixture
 def dummy_image_file(tmp_path: Path) -> str:
     """Fixture membuat file gambar dummy."""

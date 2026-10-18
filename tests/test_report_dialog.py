@@ -2,22 +2,13 @@
 Photo Rename Studio - Pengujian Unit ReportDialog
 """
 
-import os
+import sys
 import tempfile
 import pytest
 from PySide6.QtWidgets import QApplication
 
 from src.ui.report_dialog import ReportDialog
 from src.utils.file_utils import open_folder_in_explorer
-
-
-@pytest.fixture(scope="session")
-def qapp():
-    """Fixture instance QApplication."""
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
 
 
 def test_report_dialog_success_only(qapp):
@@ -87,14 +78,21 @@ def test_report_dialog_with_errors(qapp):
         dialog.close()
 
 
-def test_open_folder_in_explorer():
+def test_open_folder_in_explorer(monkeypatch):
     """Verifikasi fungsi utilitas open_folder_in_explorer."""
     # Folder non-existent harus return False
     assert open_folder_in_explorer("/non/existent/path/xyz123") is False
     assert open_folder_in_explorer("") is False
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Folder valid
+        # Mock pemanggilan shell explorer agar tidak me-lock folder temporary di Windows
+        import os
+        if sys.platform == "win32":
+            monkeypatch.setattr(os, "startfile", lambda p: None, raising=False)
+        else:
+            import subprocess
+            monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: None)
+
         res = open_folder_in_explorer(tmpdir)
-        assert isinstance(res, bool)
+        assert res is True
 

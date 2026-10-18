@@ -12,15 +12,6 @@ from src.ui.main_window import MainWindow
 from src.ui.row_widget import RowStatus
 
 
-@pytest.fixture(scope="session")
-def qapp():
-    """Fixture QApplication instance."""
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
-
-
 @pytest.fixture
 def main_window(qapp):
     """Fixture MainWindow instance."""

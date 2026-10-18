@@ -23,15 +23,6 @@ from src.ui.report_dialog import ReportDialog
 from src.ui.row_widget import RowStatus
 
 
-@pytest.fixture(scope="session")
-def qapp():
-    """Fixture instance QApplication."""
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
-
-
 @pytest.fixture
 def create_sample_image():
     """Helper membuat file gambar dummy untuk pengujian."""

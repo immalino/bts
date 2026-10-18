@@ -352,6 +352,7 @@ class TestExcelGeneratorThread:
         # C6: col C (index 2), row 6 (index 5)
         assert img3.anchor._from.col == 2
         assert img3.anchor._from.row == 5
+        wb_out.close()
 
     def test_custom_sizing_mode(
         self, tmp_path: Path, dummy_template_path: str, sample_photos: dict
@@ -384,6 +385,7 @@ class TestExcelGeneratorThread:
         # 1 px = 9525 EMUs
         assert round(img.anchor.ext.cx / 9525) == 150
         assert round(img.anchor.ext.cy / 9525) == 120
+        wb.close()
 
     def test_with_project_data(
         self, tmp_path: Path, dummy_template_path: str, sample_photos: dict
@@ -592,6 +594,7 @@ class TestExcelGeneratorThread:
         disp_h = round(img.anchor.ext.cy / 9525)
         assert disp_w <= 300
         assert disp_h <= 100
+        wb.close()
 
         # 2. Buka arsip zip Excel dan verifikasi piksel fisik gambar media tetap 1600x1200 (tajam)
         with zipfile.ZipFile(output_file, "r") as z:
@@ -660,4 +663,5 @@ class TestExcelGeneratorThread:
         assert wb["Equipment"]["A1"].value == "JKT-KUNINGAN-001"
         assert wb["Tower"]["A1"].value == "Default Tower Note"
         assert len(wb["Antenna"]._images) == 1
+        wb.close()
 

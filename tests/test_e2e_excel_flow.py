@@ -375,6 +375,7 @@ def test_e2e_mixed_photo_and_text_excel_generation(
     assert wb["Antenna"]["A1"].value == "PASAR-MINGGU-042"
     assert wb["Equipment"]["B2"].value == "Budi (Lead)"
     assert len(wb["Antenna"]._images) == 1
+    wb.close()
 
     window.close()
 
