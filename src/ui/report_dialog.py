@@ -270,3 +270,4 @@ class ReportDialog(QDialog):
                 "Gagal Membuka Folder",
                 f"Tidak dapat membuka direktori output:\n{self.output_directory}",
             )
+

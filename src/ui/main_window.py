@@ -7,6 +7,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -23,7 +24,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.config import DEFAULT_ROW_COUNT, ThemeColors
+from src.config import APP_ICON_ICO, APP_ICON_PNG, DEFAULT_ROW_COUNT, ThemeColors
 from src.core.exporter import ExportTask, ExporterThread
 from src.core.importer import import_names_from_csv, import_names_from_txt
 from src.core.validator import validate_batch
@@ -58,6 +59,12 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Photo Rename Studio")
         self.resize(1024, 768)
         self.setMinimumSize(880, 600)
+
+        # Set Window Icon jika tersedia
+        if APP_ICON_PNG.exists():
+            self.setWindowIcon(QIcon(str(APP_ICON_PNG)))
+        elif APP_ICON_ICO.exists():
+            self.setWindowIcon(QIcon(str(APP_ICON_ICO)))
 
         # Central widget & main layout
         central_widget = QWidget(self)

@@ -2,7 +2,19 @@
 Photo Rename Studio - Konfigurasi dan Konstanta Aplikasi
 """
 
+import sys
+from pathlib import Path
 from typing import Final, Tuple
+
+# Menentukan root direktori (kompatibel saat running script langsung maupun frozen PyInstaller)
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    BASE_DIR: Final[Path] = Path(sys._MEIPASS)
+else:
+    BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent
+
+ASSETS_DIR: Final[Path] = BASE_DIR / "assets"
+APP_ICON_PNG: Final[Path] = ASSETS_DIR / "icon.png"
+APP_ICON_ICO: Final[Path] = ASSETS_DIR / "icon.ico"
 
 # Ekstensi gambar yang didukung aplikasi
 SUPPORTED_EXTENSIONS: Final[Tuple[str, ...]] = (

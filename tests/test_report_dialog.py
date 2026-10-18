@@ -97,3 +97,4 @@ def test_open_folder_in_explorer():
         # Folder valid
         res = open_folder_in_explorer(tmpdir)
         assert isinstance(res, bool)
+

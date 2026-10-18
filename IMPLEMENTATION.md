@@ -574,22 +574,22 @@ Mengemas aplikasi menjadi file `.exe` portabel menggunakan PyInstaller, membuat 
 - Seluruh file pengujian di `tests/`
 
 #### 📋 Checklist Tugas Sesi 7
-- [ ] Siapkan icon aplikasi (format `.ico` dan `.png`) di folder aset.
-- [ ] Buat file konfigurasi `build_scripts/photo_rename_studio.spec` atau script `build_scripts/build_exe.py`:
+- [x] Siapkan icon aplikasi (format `.ico` dan `.png`) di folder aset.
+- [x] Buat file konfigurasi `build_scripts/photo_rename_studio.spec` atau script `build_scripts/build_exe.py`:
   - Menyertakan data aset jika ada.
   - Mengabaikan (*exclude*) paket yang tidak diperlukan untuk memangkas ukuran EXE.
   - Menetapkan icon aplikasi dan flag windowed.
-- [ ] Tulis file `README.md`:
+- [x] Tulis file `README.md`:
   - Gambaran umum dan fitur utama aplikasi.
   - Cara instalasi & menjalankan dari source code.
   - Cara build EXE sendiri menggunakan PyInstaller di Windows.
   - Petunjuk penggunaan langkah-demi-langkah bagi pengguna awam.
   - Penjelasan aturan keamanan file dan dukungan format foto.
-- [ ] Jalankan audit kode dan seluruh test suite:
+- [x] Jalankan audit kode dan seluruh test suite:
   ```bash
   pytest -v
   ```
-- [ ] Pastikan tidak ada bug tersisa, tombol palsu, dead code, atau error yang belum ditangani.
+- [x] Pastikan tidak ada bug tersisa, tombol palsu, dead code, atau error yang belum ditangani.
 
 #### 🧪 Cara Verifikasi Sesi 7
 Jalankan pengujian akhir di terminal:
@@ -647,10 +647,10 @@ git commit -m "feat(sesi-7): konfigurasi build pyinstaller exe, readme komprehen
 
 Beri tanda centang `[x]` dan tanggal ketika sesi selesai dikerjakan:
 
-- [ ] **Sesi 1: Setup Environment & Konfigurasi** *(Tanggal: ___________)*
-- [ ] **Sesi 2: Core Logic (Validator & Importer) + Unit Tests** *(Tanggal: ___________)*
-- [ ] **Sesi 3: Core Exporter & Threading Salin Aman** *(Tanggal: ___________)*
-- [ ] **Sesi 4: UI Komponen Baris & Drag-and-Drop** *(Tanggal: ___________)*
-- [ ] **Sesi 5: MainWindow & ScrollArea 100 Baris** *(Tanggal: ___________)*
-- [ ] **Sesi 6: Integrasi Ekspor, Progress Bar & Laporan** *(Tanggal: ___________)*
-- [ ] **Sesi 7: Build Windows EXE, Dokumentasi & Final Check** *(Tanggal: ___________)*
+- [x] **Sesi 1: Setup Environment & Konfigurasi** *(Tanggal: 2026-10-18)*
+- [x] **Sesi 2: Core Logic (Validator & Importer) + Unit Tests** *(Tanggal: 2026-10-18)*
+- [x] **Sesi 3: Core Exporter & Threading Salin Aman** *(Tanggal: 2026-10-18)*
+- [x] **Sesi 4: UI Komponen Baris & Drag-and-Drop** *(Tanggal: 2026-10-18)*
+- [x] **Sesi 5: MainWindow & ScrollArea 100 Baris** *(Tanggal: 2026-10-18)*
+- [x] **Sesi 6: Integrasi Ekspor, Progress Bar & Laporan** *(Tanggal: 2026-10-18)*
+- [x] **Sesi 7: Build Windows EXE, Dokumentasi & Final Check** *(Tanggal: 2026-10-18)*

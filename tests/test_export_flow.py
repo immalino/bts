@@ -244,3 +244,4 @@ def test_scenario_export_overwrite_behavior(qapp, create_sample_image, monkeypat
         assert new_dest_hash == get_file_hash(src_photo)
 
         window.close()
+
