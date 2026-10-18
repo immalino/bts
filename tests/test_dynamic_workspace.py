@@ -327,3 +327,4 @@ def test_main_window_switch_project(qapp, tmp_path: Path, dummy_image_file: str)
     assert window.dynamic_rows[0].lbl_field_name.text() == "Foto Sektor A"
     assert window.dynamic_rows[1].lbl_field_name.text() == "Foto Sektor B"
     window.close()
+

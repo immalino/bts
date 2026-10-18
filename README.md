@@ -1,11 +1,12 @@
-# Photo Rename Studio 📸✨
+# Photo Rename Studio & Document Control BTS 📸📊
 
-> **Aplikasi desktop modern, cepat, dan aman untuk penggantian nama foto massal (batch renaming) dengan antarmuka visual interaktif.**
+> **Aplikasi desktop modern, cepat, dan aman untuk penggantian nama foto massal (Tahap 1) serta Document Control & Generator Laporan Excel Lapangan BTS Telkom (Tahap 2) dengan antarmuka visual interaktif.**
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI Framework](https://img.shields.io/badge/GUI-PySide6%20(Qt6)-41CD52.svg)](https://wiki.qt.io/Qt_for_Python)
+[![openpyxl](https://img.shields.io/badge/excel-openpyxl-green.svg)](https://openpyxl.readthedocs.io/)
 [![Pillow](https://img.shields.io/badge/image-Pillow-yellow.svg)](https://python-pillow.org/)
-[![Tests](https://img.shields.io/badge/tests-pytest-green.svg)](https://pytest.org/)
+[![Tests](https://img.shields.io/badge/tests-pytest%20(100%25%20passed)-brightgreen.svg)](https://pytest.org/)
 [![License](https://img.shields.io/badge/license-MIT-informational.svg)](LICENSE)
 
 ---
@@ -13,69 +14,71 @@
 ## 📌 Daftar Isi
 1. [Tentang Aplikasi](#-tentang-aplikasi)
 2. [Fitur Utama](#-fitur-utama)
+   - [Mode Tahap 1: Batch Renaming Cepat](#mode-tahap-1-batch-renaming-cepat)
+   - [Mode Tahap 2: Document Control BTS Telkom](#mode-tahap-2-document-control-bts-telkom)
 3. [Jaminan Keamanan File (Zero Data Loss)](#-jaminan-keamanan-file-zero-data-loss)
 4. [Dukungan Format File Foto](#-dukungan-format-file-foto)
 5. [Struktur Proyek](#-struktur-proyek)
 6. [Instalasi & Menjalankan dari Source Code](#-instalasi--menjalankan-dari-source-code)
-7. [Panduan Penggunaan Langkah-demi-Langkah](#-panduan-penggunaan-langkah-demi-langkah)
-8. [Panduan Build Windows EXE Portabel](#-panduan-build-windows-exe-portabel)
-9. [Menjalankan Pengujian Otomatis (Unit Tests)](#-menjalankan-pengujian-otomatis-unit-tests)
-10. [Troubleshooting & FAQ](#-troubleshooting--faq)
+7. [Panduan Penggunaan Alur Document Control BTS (Tahap 2)](#-panduan-penggunaan-alur-document-control-bts-tahap-2)
+8. [Panduan Penggunaan Alur Batch Renaming (Tahap 1)](#-panduan-penggunaan-alur-batch-renaming-tahap-1)
+9. [Panduan Build Windows EXE Portabel](#-panduan-build-windows-exe-portabel)
+10. [Menjalankan Pengujian Otomatis (Unit Tests)](#-menjalankan-pengujian-otomatis-unit-tests)
+11. [Troubleshooting & FAQ](#-troubleshooting--faq)
 
 ---
 
 ## 📖 Tentang Aplikasi
 
-**Photo Rename Studio** dirancang khusus untuk fotografer, pengelola aset visual, panitia buku tahunan sekolah (BTS), staf administrasi, dan profesional kreatif yang sering menghadapi tantangan mengganti nama ratusan hingga ribuan foto secara berurutan sesuai daftar nama (misalnya daftar siswa, nomor induk, atau kode produk).
+**Photo Rename Studio** berevolusi dari sekadar alat penggantian nama foto massal menjadi sistem **Document Control Lapangan BTS** terintegrasi. 
 
-Dengan pendekatan visual drag-and-drop dan verifikasi real-time, pengguna dapat memetakan foto sumber ke nama target baru tanpa risiko kehilangan data atau kesalahan pengetikan karakter ilegal Windows.
+Aplikasi ini mengatasi tantangan utama tim lapangan telekomunikasi dan Document Control (DC):
+- Menyusun ratusan foto dokumentasi site (antena sektoral, perangkat microwave, rectifier, tower) ke dalam template laporan resmi Microsoft Excel (`.xlsx`).
+- Menata ukuran gambar secara proporsional sesuai dimensi sel target Excel (*Auto-Fit Cell & Merged Cells*).
+- Menghilangkan proses manual *insert picture* satu per satu di Microsoft Excel yang memakan waktu berjam-jam.
 
 ---
 
 ## ✨ Fitur Utama
 
-- 🎨 **Antarmuka Bersih & Modern**: Dibangun menggunakan PySide6 (Qt6) dengan palet warna kontras yang ramah mata (*Slate Blue & Emerald*).
-- 🖱️ **Drag-and-Drop Intuitif**: Tarik dan lepas (*drag-and-drop*) file foto langsung dari File Explorer Windows ke baris yang diinginkan.
-- 🖼️ **Thumbnail Preview Otomatis**: Pratinjau instan foto thumbnail dengan orientasi EXIF otomatis (foto tegak tidak akan terbalik).
-- 📋 **Impor Nama Massal (TXT & CSV)**:
-  - Dukungan file `.txt` (satu nama per baris).
-  - Dukungan file `.csv` dengan berbagai delimiter (koma `,`, titik koma `;`, atau tab `\t`) dan pemilihan kolom target secara otomatis atau interaktif.
-  - Auto-expand: Baris otomatis bertambah jika nama yang diimpor melebihi 100 baris.
-- 🛡️ **Validasi Aturan Penamaan Windows Real-Time**:
-  - Deteksi dan peringatan karakter ilegal Windows (`\ / : * ? " < > |`).
-  - Pencegahan nama reserved Windows (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`).
-  - Deteksi nama duplikat secara *case-insensitive* (`Foto.jpg` vs `foto.jpg`).
-  - Penanganan spasi dan titik di akhir nama.
-- ⚡ **Background Processing & Multi-Threading**:
-  - Proses penyalinan berjalan di thread terpisah (`QThread`) sehingga UI tetap responsif tanpa *freeze*.
-  - Dilengkapi tombol pembatalan proses (*Cancel*) yang aman sewaktu-waktu.
-- 📊 **Progress Bar & Dialog Laporan Interaktif**:
-  - Indikator persentase penyalinan real-time.
-  - Dialog laporan hasil akhir dengan kartu statistik (Total, Berhasil, Gagal, Dilewati).
-  - Tab rincian log kesalahan dengan tombol salin log (*Copy to Clipboard*).
-  - Tombol pintasan langsung membuka folder hasil di File Explorer.
+### Mode Tahap 1: Batch Renaming Cepat
+- 🎨 **Antarmuka Bersih & Modern**: Dibangun menggunakan PySide6 (Qt6) tanpa emoji murahan, menggunakan icon sistem native Qt yang tajam.
+- 🖱️ **Drag-and-Drop Intuitif**: Tarik dan lepas file foto langsung dari File Explorer Windows ke baris yang diinginkan.
+- 🖼️ **Thumbnail Preview Otomatis**: Pratinjau instan foto thumbnail dengan koreksi rotasi EXIF otomatis (foto potret/lanskap tegak sempurna).
+- 📋 **Impor Nama Massal (TXT & CSV)**: Dukungan file `.txt` dan `.csv` dengan berbagai delimiter dan auto-expand baris.
+- 🛡️ **Validasi Penamaan Windows Real-Time**: Deteksi karakter ilegal (`\ / : * ? " < > |`), reserved names (`CON`, `PRN`), dan duplikasi nama *case-insensitive*.
+
+### Mode Tahap 2: Document Control BTS Telkom
+- 📁 **Manajemen Proyek Site (Site Manager)**:
+  - Membuat dan beralih antar proyek site (contoh: `JKT-042 Pasar Minggu`) dengan riwayat status tersimpan otomatis.
+  - State Auto-Persistence: Setiap foto yang di-drop langsung tercatat ke database lokal JSON tanpa risiko kehilangan progres kerja.
+- 📊 **Visual Template Manager & Inspector**:
+  - Konfigurasi template laporan `.xlsx` tanpa menyentuh kode.
+  - **Auto-Load Sheet Inspector**: Membaca otomatis seluruh sheet di workbook Excel template.
+  - Visual Field Table: Menentukan label foto, sheet tujuan, sel anchor (misal `B5`), dan mode ukuran gambar.
+- 📐 **Auto-Fit Cell Engine & Merged Cells Support**:
+  - Menghitung lebar dan tinggi sel Excel tunggal maupun *merged cells* dalam satuan piksel.
+  - Resize proporsional dengan filter lanczos dan margin/padding otomatis agar tidak menabrak border sel.
+  - Mode custom size (lebar $\times$ tinggi kustom) untuk kebutuhan khusus.
+- ⚡ **Background Generation & 1-Klik Handover**:
+  - Pembuatan dokumen Excel berjalan non-blocking di background thread (`ExcelGeneratorThread`) dengan progress bar real-time.
+  - Tombol pintasan **"Buka Dokumen Excel"** dan **"Buka Folder Output"** langsung setelah proses selesai.
 
 ---
 
 ## 🔒 Jaminan Keamanan File (Zero Data Loss)
 
-Keamanan data foto sumber Anda adalah prioritas nomor satu. Photo Rename Studio menerapkan arsitektur perlindungan data yang ketat:
-
 1. **Non-Destructive Copying**:
-   - Aplikasi **TIDAK PERNAH** menggunakan perintah `os.rename()` atau `shutil.move()` pada file foto asli.
-   - Aplikasi menggunakan `shutil.copy2()`, yang membuat salinan baru ke folder tujuan sambil mempertahankan metadata asli foto (*date modified*, dsb).
-   - Foto sumber Anda tetap 100% utuh di lokasi awalnya.
-2. **Perlindungan Terhadap Overwrite yang Tidak Disengaja**:
-   - Jika file dengan nama target sudah ada di folder tujuan, sistem secara default **menolak** menimpa file tersebut dan menandainya sebagai error/skip.
-   - Pengguna harus secara sadar mencentang kotak *Checkbox* **"Timpa file jika sudah ada"** jika memang bermaksud menimpa file lama.
-3. **Penyalinan Ekstensi Asli Otomatis**:
-   - Ekstensi file asli (`.jpg`, `.png`, dll.) selalu dipertahankan secara otomatis meskipun pengguna tidak mengetikkan ekstensi pada kolom nama baru.
+   - Sistem **TIDAK PERNAH** memindahkan atau mengubah file foto sumber asli.
+   - Foto sumber selalu dibaca secara *read-only*.
+2. **Perlindungan Overwrite**:
+   - Mencegah penimpaan file yang tidak disengaja.
+3. **Penyalinan Atomik**:
+   - Data state JSON disimpan secara atomik (`.tmp` $\rightarrow$ swap) untuk mencegah kerusakan berkas jika listrik mati mendadak.
 
 ---
 
 ## 📁 Dukungan Format File Foto
-
-Photo Rename Studio mendukung berbagai format citra raster modern:
 
 | Format | Ekstensi yang Didukung | Keterangan |
 | :--- | :--- | :--- |
@@ -84,42 +87,53 @@ Photo Rename Studio mendukung berbagai format citra raster modern:
 | **WebP** | `.webp` | Format web modern kompresi tinggi |
 | **BMP** | `.bmp` | Windows Bitmap format standar |
 | **TIFF** | `.tiff`, `.tif` | Format master fotografi resolusi tinggi |
-| **GIF** | `.gif` | Format citra diam/animasi frame pertama |
+| **GIF** | `.gif` | Format citra frame pertama |
 
 ---
 
 ## 🏗️ Struktur Proyek
 
 ```text
-photo-rename-studio/
+my-bts/
 ├── assets/                          # Aset visual (icon.png, icon.ico)
 ├── build_scripts/                   # Skrip otomatisasi packaging EXE
-│   ├── build_exe.py                 # Runner build PyInstaller lintas platform
+│   ├── build_exe.py                 # Runner build PyInstaller
 │   ├── generate_icons.py            # Generator ikon resolusi tinggi
 │   └── photo_rename_studio.spec     # Konfigurasi PyInstaller Windows
 ├── src/                             # Kode Sumber Utama
-│   ├── config.py                    # Konstanta, konfigurasi tema & ekstensi
+│   ├── config.py                    # Konstanta, tema warna & ekstensi
 │   ├── main.py                      # Titik masuk aplikasi (Entry Point)
-│   ├── core/                        # Logika Inti & Pemrosesan
-│   │   ├── exporter.py              # Engine ekspor salin aman & thread pekerja
-│   │   ├── image_loader.py          # Loader thumbnail & EXIF orientation
+│   ├── core/                        # Engine Pemrosesan & Data Models
+│   │   ├── excel_generator.py       # Engine generator Excel & background worker
+│   │   ├── exporter.py              # Engine ekspor salin aman file foto (Tahap 1)
+│   │   ├── image_loader.py          # Loader thumbnail & koreksi EXIF
 │   │   ├── importer.py              # Parser impor TXT dan CSV
-│   │   └── validator.py             # Validasi nama file aturan Windows
-│   ├── ui/                          # Komponen Antarmuka Grafis (PySide6)
-│   │   ├── drop_zone.py             # Komponen visual drag-and-drop foto
-│   │   ├── main_window.py           # Jendela utama aplikasi & tabel 100 baris
-│   │   ├── report_dialog.py         # Modal ringkasan laporan hasil ekspor
-│   │   ├── row_widget.py            # Komponen baris individual foto & nama
-│   │   └── styles.py                # Lembar gaya global (QSS / Qt Stylesheet)
+│   │   ├── models.py                # Model PhotoFieldConfig, TemplateConfig, ProjectData
+│   │   ├── storage.py               # Manajer persistensi data JSON lokal
+│   │   └── validator.py             # Validasi penamaan aturan Windows
+│   ├── ui/                          # Antarmuka Pengguna Grafis (PySide6)
+│   │   ├── drop_zone.py             # Drop zone interaktif drag-and-drop
+│   │   ├── dynamic_row.py           # Komponen baris foto dinamis berbasis template
+│   │   ├── main_window.py           # Jendela utama aplikasi & routing workspace
+│   │   ├── project_dialog.py        # Dialog manajemen proyek site
+│   │   ├── report_dialog.py         # Modal ringkasan laporan hasil & shortcut open Excel
+│   │   ├── row_widget.py            # Baris foto individual 100 baris (Tahap 1)
+│   │   ├── styles.py                # Tema modern QSS / stylesheet
+│   │   └── template_dialog.py       # Dialog visual template manager & editor field
 │   └── utils/                       # Utilitas Pendukung
-│       └── file_utils.py            # Utilitas file hash, reserved name & explorer
+│       ├── excel_utils.py           # Kalkulator dimensi sel, auto-fit, & sheet reader
+│       └── file_utils.py            # Utilitas file hash & explorer
 ├── tests/                           # Unit Tests & Automated Test Suites
-│   ├── conftest.py                  # Fixtures pytest & mock environment
-│   ├── test_export_flow.py          # Pengujian skenario integrasi end-to-end
-│   ├── test_exporter.py             # Pengujian unit salin aman & threading
+│   ├── test_dynamic_workspace.py    # Pengujian integrasi workspace dinamis & auto-save
+│   ├── test_e2e_excel_flow.py       # Pengujian end-to-end pembuatan dokumen Excel
+│   ├── test_excel_generator.py      # Pengujian unit engine Excel generator
+│   ├── test_export_flow.py          # Pengujian integrasi ekspor foto Tahap 1
+│   ├── test_exporter.py             # Pengujian unit penyalinan file foto
 │   ├── test_importer.py             # Pengujian parsing TXT dan CSV
-│   ├── test_main_window.py          # Pengujian antarmuka GUI jendela utama
-│   ├── test_report_dialog.py        # Pengujian dialog laporan hasil ekspor
+│   ├── test_main_window.py          # Pengujian antarmuka GUI MainWindow
+│   ├── test_report_dialog.py        # Pengujian dialog laporan hasil
+│   ├── test_storage.py              # Pengujian persistensi storage template & project
+│   ├── test_template_dialog.py      # Pengujian dialog template & editor field
 │   └── test_validator.py            # Pengujian validasi penamaan Windows
 ├── IMPLEMENTATION.md                # Spesifikasi implementasi dan checklist modul
 ├── requirements.txt                 # Dependensi Python runtime
@@ -131,18 +145,17 @@ photo-rename-studio/
 ## 🚀 Instalasi & Menjalankan dari Source Code
 
 ### Prasyarat
-- Python 3.10 atau versi yang lebih baru terpasang di sistem Anda.
-- Git (opsional, untuk mengklon repositori).
+- Python 3.10 atau versi yang lebih baru terpasang di sistem.
+- Pip package manager.
 
 ### Langkah-langkah:
 
-1. **Klon atau Buka Repositori Proyek:**
+1. **Buka Repositori Proyek:**
    ```bash
-   git clone https://github.com/username/photo-rename-studio.git
-   cd photo-rename-studio
+   cd my-bts
    ```
 
-2. **Buat dan Aktifkan Virtual Environment (Direkomendasikan):**
+2. **Buat dan Aktifkan Virtual Environment:**
    - **Di Windows:**
      ```bash
      python -m venv venv
@@ -166,63 +179,69 @@ photo-rename-studio/
 
 ---
 
-## 🎯 Panduan Penggunaan Langkah-demi-Langkah
+## 🎯 Panduan Penggunaan Alur Document Control BTS (Tahap 2)
 
-### Langkah 1: Siapkan Nama Baru
-Anda dapat mengisi nama baru dengan dua cara:
-- **Ketik Manual**: Langsung ketikkan nama target pada kolom teks di baris yang bersangkutan.
-- **Impor Massal**:
-  - Klik tombol **"📄 Impor Nama (.txt/.csv)"** pada toolbar atas.
-  - Pilih file `.txt` atau `.csv` yang berisi daftar nama.
-  - Jika file CSV memiliki banyak kolom, aplikasi akan menanyakan nomor kolom nama yang ingin digunakan.
-  - Baris akan terisi secara otomatis dari atas ke bawah.
+### 1. Kelola Template Excel
+- Klik tombol **"Kelola Template"** pada toolbar atas.
+- Klik **"Buat Template Baru"**.
+- Beri nama template (contoh: `Template Telkomsel BTS 4G/5G`).
+- Pilih file template master `.xlsx` Anda. Nama-nama sheet di dalam file akan terbaca secara otomatis.
+- Klik **"Tambah Field"** untuk menambahkan posisi foto:
+  - Beri nama label field (contoh: `Foto Antenna Sector 1`).
+  - Pilih sheet target (contoh: `Antenna`).
+  - Masukkan sel anchor (contoh: `B5`).
+  - Pilih mode ukuran (Auto-Fit Cell direkomendasikan).
+- Klik **"Simpan Template"**.
 
-### Langkah 2: Pasangkan Foto Sumber
-- Tarik (*drag*) file foto dari File Explorer dan lepas (*drop*) ke kotak **"Tarik Foto ke Sini"** pada baris yang sesuai.
-- Atau klik kotak tersebut untuk membuka dialog pemilihan file foto manual.
-- Thumbnail foto dan nama file asli akan langsung ditampilkan.
+### 2. Buat atau Pilih Proyek Site
+- Klik tombol **"Ganti / Pilih Site"** pada toolbar atas.
+- Klik **"Proyek Site Baru"**.
+- Masukkan Nama/ID Site (contoh: `JKT-042 Pasar Minggu`) dan pilih template yang telah dibuat.
+- Klik **"Buat Proyek"**.
+- Workspace akan langsung menampilkan baris-baris foto dinamis sesuai urutan field template Anda!
 
-### Langkah 3: Pilih Folder Tujuan (Output)
-- Pada bagian bawah aplikasi, klik tombol **"📁 Pilih Folder..."**.
-- Tentukan direktori tempat salinan foto dengan nama baru akan disimpan.
+### 3. Masukkan Foto Dokumentasi Lapangan
+- Tarik (*drag-and-drop*) file foto dari File Explorer ke kotak dropzone baris yang sesuai, atau klik tombol **"Pilih"**.
+- Thumbnail foto akan langsung tampil tegak sesuai rotasi EXIF kamera.
+- Status baris akan berubah menjadi badge hijau **"Terisi"**.
+- Setiap foto yang dimasukkan **otomatis tersimpan** ke file project lokal (aman jika aplikasi tertutup).
 
-### Langkah 4: Opsi Tambahan (Opsional)
-- **Hapus Baris Kosong**: Klik tombol **"🗑️ Hapus Baris Kosong"** di toolbar untuk membersihkan baris yang tidak digunakan.
-- **Tambah Baris**: Klik tombol **"➕ Tambah Baris"** jika membutuhkan slot baris tambahan.
-- **Timpa File**: Centang kotak **"Timpa file jika sudah ada"** hanya jika Anda mengizinkan file lama di folder tujuan digantikan oleh salinan baru.
+### 4. Generate Dokumen Excel Laporan
+- Klik tombol biru **"Generate Dokumen Excel"** di bagian bawah.
+- Tentukan nama dan lokasi file hasil laporan (contoh: `Laporan_JKT_042_20261018.xlsx`).
+- Generator akan memproses foto di background: membaca dimensi sel target, meresize foto secara proporsional, dan menanamkannya ke sheet Excel yang tepat.
+- Setelah selesai, dialog laporan akan muncul:
+  - Klik **"Buka Dokumen Excel"** untuk langsung membuka Microsoft Excel / LibreOffice dan meninjau hasil dokumen.
+  - Klik **"Buka Folder Output"** untuk melihat berkas di file manager.
 
-### Langkah 5: Ekspor Foto
-- Klik tombol biru besar **"🚀 Mulai Ekspor Foto"**.
-- Sistem akan melakukan validasi kilat. Jika ada kesalahan (seperti nama duplikat atau karakter terlarang), sistem akan membatalkan proses dan menunjukkan baris yang perlu diperbaiki.
-- Perhatikan indikator progress bar selama penyalinan berlangsung.
-- Setelah selesai, dialog **Laporan Hasil Ekspor** akan muncul dengan ringkasan status. Klik tombol **"📂 Buka Folder Output"** untuk langsung meninjau hasilnya di Windows Explorer.
+---
+
+## 📸 Panduan Penggunaan Alur Batch Renaming (Tahap 1)
+
+1. Buka aplikasi tanpa memilih proyek site (tampilan default 100 baris).
+2. Isi nama baru manual atau klik **"Impor Nama (TXT/CSV)"**.
+3. Tarik dan lepas foto ke baris yang bersangkutan.
+4. Tentukan folder output dengan mengklik **"Pilih Folder"**.
+5. Klik **"Generate Dokumen Excel" / "Proses Ekspor"** untuk mengekspor foto salinan berurutan.
 
 ---
 
 ## 📦 Panduan Build Windows EXE Portabel
 
-Aplikasi dapat dikompilasi menjadi satu file eksekutabel tunggal portabel (`.exe`) yang berjalan di Windows tanpa perlu menginstal Python di komputer target.
+Aplikasi dapat dikompilasi menjadi satu file eksekutabel tunggal portabel (`.exe`) yang berjalan di Windows tanpa perlu menginstal Python di komputer target:
 
-### Cara Cepat (Menggunakan Script Otomatis):
-Di komputer Windows dengan environment Python yang aktif:
 ```powershell
 pip install pyinstaller
 python build_scripts/build_exe.py
 ```
 
-### Cara Manual (Menggunakan PyInstaller Spec):
-```powershell
-pyinstaller build_scripts/photo_rename_studio.spec
-```
-
 ### Parameter Konfigurasi PyInstaller yang Digunakan:
-- `--noconsole` / `--windowed`: Mencegah jendela hitam command prompt (DOS) muncul di belakang aplikasi.
-- `--onefile`: Mengemas seluruh komponen ke dalam satu file biner `dist/PhotoRenameStudio.exe`.
+- `--noconsole` / `--windowed`: Mencegah jendela console DOS muncul di belakang aplikasi.
+- `--onefile`: Mengemas seluruh komponen ke dalam satu file biner tunggal portabel.
 - `--icon "assets/icon.ico"`: Menyematkan ikon resmi aplikasi pada file `.exe`.
-- `--add-data "assets;assets"`: Memasukkan aset grafis ke dalam *bundle package*.
-- **Optimization Excludes**: Mengabaikan pustaka Qt besar yang tidak digunakan (seperti WebEngine, 3D, QML, Multimedia, Test) guna memangkas ukuran biner dan mempercepat waktu pemuatan.
+- `--add-data "assets;assets"`: Memasukkan bundel aset ikon ke dalam aplikasi.
 
-Hasil akhir file biner portabel dapat ditemukan di direktori:
+File portabel siap digunakan berada di:
 ```text
 dist/PhotoRenameStudio.exe
 ```
@@ -231,43 +250,49 @@ dist/PhotoRenameStudio.exe
 
 ## 🧪 Menjalankan Pengujian Otomatis (Unit Tests)
 
-Proyek ini dilengkapi dengan cakupan pengujian unit komprehensif menggunakan `pytest`.
+Proyek ini dilengkapi dengan 105 pengujian otomatis menggunakan `pytest` dengan cakupan 100% lulus.
 
-Jalankan seluruh test suite dengan perintah:
+Jalankan seluruh test suite:
 ```bash
-pytest -v
+./venv/bin/pytest -v
 ```
 
-Untuk menjalankan test suite spesifik:
+Jalankan test suite modul spesifik:
 ```bash
-# Pengujian alur ekspor dan skenario integrasi:
+# Pengujian alur end-to-end generator Excel (Tahap 2):
+pytest tests/test_e2e_excel_flow.py -v
+
+# Pengujian dynamic workspace & auto-persistence:
+pytest tests/test_dynamic_workspace.py -v
+
+# Pengujian template visual dialog:
+pytest tests/test_template_dialog.py -v
+
+# Pengujian core excel generator & auto-fit:
+pytest tests/test_excel_generator.py -v
+
+# Pengujian storage manager JSON:
+pytest tests/test_storage.py -v
+
+# Pengujian alur ekspor Tahap 1:
 pytest tests/test_export_flow.py -v
-
-# Pengujian validasi penamaan Windows:
-pytest tests/test_validator.py -v
-
-# Pengujian mesin penyalinan file aman:
-pytest tests/test_exporter.py -v
-
-# Pengujian pengimpor file teks dan CSV:
-pytest tests/test_importer.py -v
 ```
 
 ---
 
 ## ❓ Troubleshooting & FAQ
 
-#### Q: Mengapa muncul pesan error "Nama sudah digunakan" padahal hurufnya berbeda?
-> **Jawab**: Sistem berkas Windows bersifat *case-insensitive* (`Foto_01.jpg` dianggap sama dengan `foto_01.jpg`). Validator aplikasi mencegah benturan nama ini sejak awal untuk melindungi data Anda.
+#### Q: Mengapa gambar di Excel pas dengan ukuran kotak sel tanpa merusak rasio foto?
+> **Jawab**: Engine generator menghitung dimensi piksel sel target (termasuk *merged cells*), lalu menerapkan algoritma aspect-ratio fitting dengan filter Lanczos resolusi tinggi dan margin internal 2px.
 
-#### Q: Kursor menampilkan lambang dilarang (🚫) saat menarik foto ke baris?
-> **Jawab**: Pastikan format foto yang Anda tarik termasuk dalam daftar ekstensi yang didukung (`.jpg`, `.jpeg`, `.png`, `.webp`, `.bmp`, `.tiff`, `.gif`). Format selain foto akan ditolak secara otomatis.
+#### Q: Apakah file template master `.xlsx` asli saya akan tertimpa saat generate?
+> **Jawab**: Tidak pernah. Template master hanya dibaca, dan salinan baru dokumen laporan disimpan ke path output yang Anda tentukan.
 
-#### Q: Apakah foto asli saya aman jika terjadi mati lampu saat ekspor?
-> **Jawab**: Sangat aman. Sistem hanya membaca file asli dan menuliskan berkas salinan baru ke folder tujuan. Foto asli tidak pernah dimodifikasi atau dipindahkan.
+#### Q: Bagaimana jika saya tidak sengaja menutup aplikasi saat sedang mengisi foto?
+> **Jawab**: Setiap perubahan foto langsung dicatat (*auto-save*) ke dalam berkas JSON proyek Anda. Saat Anda membuka site tersebut kembali melalui "Ganti / Pilih Site", seluruh foto akan kembali terpasang seperti semula.
 
 ---
 
 ## 📄 Lisensi
 
-Proyek ini dirilis di bawah lisensi [MIT License](LICENSE). Bebas digunakan dan dimodifikasi untuk keperluan pribadi, komersial, maupun edukasi.
+Proyek ini dirilis di bawah lisensi [MIT License](LICENSE).

@@ -315,3 +315,4 @@ class DynamicPhotoRow(QFrame):
     def get_field_config(self) -> PhotoFieldConfig:
         """Mengambil model PhotoFieldConfig baris ini."""
         return self.field_config
+

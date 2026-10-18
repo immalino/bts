@@ -454,3 +454,4 @@ class ProjectManagerDialog(QDialog):
     def get_selected_project(self) -> Optional[ProjectData]:
         """Mengambil proyek site yang dipilih pengguna untuk dibuka."""
         return self.selected_project
+

@@ -25,8 +25,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from datetime import datetime
 
-from src.config import APP_ICON_ICO, APP_ICON_PNG, DEFAULT_ROW_COUNT, ThemeColors
+from src.config import APP_ICON_ICO, APP_ICON_PNG, BASE_DIR, DEFAULT_ROW_COUNT, ThemeColors
+from src.core.excel_generator import ExcelGeneratorThread
 from src.core.exporter import ExportTask, ExporterThread
 from src.core.importer import import_names_from_csv, import_names_from_txt
 from src.core.models import ProjectData, TemplateConfig
@@ -64,6 +66,7 @@ class MainWindow(QMainWindow):
         self.default_rows_count: int = default_rows
         self.row_widgets: List[RowWidget] = []
         self.exporter_thread: Optional[ExporterThread] = None
+        self.excel_generator_thread: Optional[ExcelGeneratorThread] = None
 
         self._init_ui()
         self._setup_connections()
@@ -271,9 +274,10 @@ class MainWindow(QMainWindow):
         self.input_output_dir.setPlaceholderText("Pilih folder tujuan hasil ekspor foto...")
         dir_layout.addWidget(self.input_output_dir, stretch=1)
 
-        self.btn_browse_dir = QPushButton("📁 Pilih Folder", self.footer_card)
+        self.btn_browse_dir = QPushButton("Pilih Folder", self.footer_card)
+        self.btn_browse_dir.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton))
         self.btn_browse_dir.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_browse_dir.setFixedWidth(120)
+        self.btn_browse_dir.setFixedWidth(130)
         dir_layout.addWidget(self.btn_browse_dir)
 
         footer_layout.addLayout(dir_layout)
@@ -313,8 +317,9 @@ class MainWindow(QMainWindow):
         action_layout = QHBoxLayout()
         action_layout.setSpacing(10)
 
-        self.btn_cancel_export = QPushButton("⏹ Batal Ekspor", self.footer_card)
+        self.btn_cancel_export = QPushButton("Batal Proses", self.footer_card)
         self.btn_cancel_export.setObjectName("DangerButton")
+        self.btn_cancel_export.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCancelButton))
         self.btn_cancel_export.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_cancel_export.setEnabled(False)
         self.btn_cancel_export.setVisible(False)
@@ -322,10 +327,11 @@ class MainWindow(QMainWindow):
 
         action_layout.addStretch(1)
 
-        self.btn_export = QPushButton("🚀 Proses Ekspor", self.footer_card)
+        self.btn_export = QPushButton("Generate Dokumen Excel", self.footer_card)
         self.btn_export.setObjectName("ExportButton")
+        self.btn_export.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogApplyButton))
         self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_export.setToolTip("Mulai validasi dan ekspor foto secara aman ke folder tujuan")
+        self.btn_export.setToolTip("Mulai validasi dan generate dokumen laporan Excel")
         action_layout.addWidget(self.btn_export)
 
         footer_layout.addLayout(action_layout)
@@ -730,7 +736,175 @@ class MainWindow(QMainWindow):
 
     def start_export(self) -> None:
         """
-        Memulai proses validasi dan ekspor seluruh baris aktif:
+        Memulai proses validasi dan ekspor/generate tergantung mode aktif:
+        - Jika dynamic workspace aktif (berbasis template): jalankan start_excel_generation() via ExcelGeneratorThread.
+        - Jika baris statis (rename biasa): jalankan start_photo_rename_export() via ExporterThread.
+        """
+        if self.dynamic_rows:
+            self.start_excel_generation()
+        else:
+            self.start_photo_rename_export()
+
+    def start_excel_generation(self) -> None:
+        """
+        Memulai alur validasi dan pembuatan dokumen Excel laporan foto via ExcelGeneratorThread.
+        """
+        if not self.current_template:
+            QMessageBox.warning(
+                self,
+                "Template Belum Dipilih",
+                "Template laporan Excel belum dipilih.\n"
+                "Silakan buka atau buat proyek site dengan template yang valid.",
+            )
+            return
+
+        if not self.current_template.template_file_path or not os.path.isfile(self.current_template.template_file_path):
+            QMessageBox.warning(
+                self,
+                "Template Tidak Ditemukan",
+                f"File template Excel tidak ditemukan pada lokasi:\n{self.current_template.template_file_path}",
+            )
+            return
+
+        filled_assignments = {
+            row.get_field_id(): row.get_photo()
+            for row in self.dynamic_rows
+            if row.get_photo() and os.path.isfile(row.get_photo())
+        }
+        if not filled_assignments:
+            QMessageBox.warning(
+                self,
+                "Foto Belum Dimasukkan",
+                "Belum ada foto yang dimasukkan pada baris template.\n"
+                "Silakan masukkan setidaknya satu foto sebelum melakukan generate dokumen Excel.",
+            )
+            return
+
+        # Tentukan nama dan lokasi file output default
+        site_slug = "BTS_Site"
+        if self.current_project and self.current_project.site_name.strip():
+            site_slug = re.sub(r'[\\/*?:"<>|\s]+', "_", self.current_project.site_name.strip())
+        date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_name = f"Laporan_{site_slug}_{date_str}.xlsx"
+
+        if self.input_output_dir.text().strip() and os.path.isdir(self.input_output_dir.text().strip()):
+            initial_dir = self.input_output_dir.text().strip()
+        elif self.current_project and self.current_project.output_dir and os.path.isdir(self.current_project.output_dir):
+            initial_dir = self.current_project.output_dir
+        else:
+            initial_dir = str(BASE_DIR / "output")
+            os.makedirs(initial_dir, exist_ok=True)
+
+        default_save_path = os.path.join(initial_dir, default_name)
+
+        output_file, _ = QFileDialog.getSaveFileName(
+            self,
+            "Simpan Dokumen Laporan Excel",
+            default_save_path,
+            "Excel Spreadsheet (*.xlsx);;Semua Berkas (*.*)",
+        )
+        if not output_file:
+            return
+
+        out_dir = os.path.dirname(os.path.abspath(output_file))
+        self.set_output_directory(out_dir)
+        if self.current_project:
+            self.current_project.output_dir = out_dir
+            self.storage.save_project(self.current_project)
+
+        # Kunci kontrol UI dan jalankan generator thread di background
+        self._set_exporting_state(True)
+        self.progress_bar.setRange(0, len(self.dynamic_rows) + 1)
+        self.progress_bar.setValue(0)
+        self.lbl_export_status.setText("Menyiapkan dokumen Excel...")
+        self.lbl_export_status.setStyleSheet(
+            f"font-size: 11px; font-weight: 500; color: {ThemeColors.TEXT_MUTED};"
+        )
+
+        self.excel_generator_thread = ExcelGeneratorThread(
+            template=self.current_template,
+            output_path=output_file,
+            photo_assignments=filled_assignments,
+            fields=[row.get_field_config() for row in self.dynamic_rows],
+            project_data=self.current_project,
+            parent=self,
+        )
+        self.excel_generator_thread.progress_updated.connect(self._on_excel_progress)
+        self.excel_generator_thread.item_finished.connect(self._on_excel_item_finished)
+        self.excel_generator_thread.generation_completed.connect(self._on_excel_completed)
+        self.excel_generator_thread.start()
+
+    def _on_excel_progress(self, current: int, total: int, message: str) -> None:
+        """Update progress bar dan label status Excel generator secara real-time."""
+        self.progress_bar.setRange(0, total)
+        self.progress_bar.setValue(current)
+        self.lbl_export_status.setText(message)
+
+    def _on_excel_item_finished(self, field_id: str, success: bool, message: str) -> None:
+        """Dipanggil saat satu foto selesai disisipkan ke Excel."""
+        for row in self.dynamic_rows:
+            if row.get_field_id() == field_id:
+                if not success:
+                    row.lbl_status.setText("Error")
+                    row.lbl_status.setStyleSheet(f"""
+                        QLabel {{
+                            background-color: #FEE2E2;
+                            color: {ThemeColors.ERROR};
+                            font-size: 11px;
+                            font-weight: 700;
+                            border-radius: 4px;
+                            border: 1px solid #FCA5A5;
+                        }}
+                    """)
+                break
+
+    def _on_excel_completed(
+        self,
+        output_path: str,
+        success_count: int,
+        fail_count: int,
+        errors: list,
+    ) -> None:
+        """Dipanggil saat ExcelGeneratorThread selesai."""
+        self._set_exporting_state(False)
+        self.progress_bar.setValue(self.progress_bar.maximum())
+
+        if self.current_project:
+            self.current_project.last_exported_at = datetime.now().isoformat()
+            self.storage.save_project(self.current_project)
+
+        if self.excel_generator_thread and self.excel_generator_thread.is_cancelled:
+            self.progress_bar.setValue(0)
+            self.lbl_export_status.setText("Pembuatan dokumen dibatalkan.")
+            QMessageBox.information(
+                self,
+                "Dibatalkan",
+                "Proses pembuatan dokumen Excel telah dibatalkan.",
+            )
+            return
+
+        status_text = f"Selesai: {success_count} foto disisipkan, {fail_count} gagal/dilewati."
+        self.lbl_export_status.setText(status_text)
+        color = ThemeColors.SUCCESS if fail_count == 0 else ThemeColors.WARNING
+        self.lbl_export_status.setStyleSheet(
+            f"font-size: 11px; font-weight: 600; color: {color};"
+        )
+        self.update_summary_stats()
+
+        dialog = ReportDialog(
+            success_count=success_count,
+            fail_count=fail_count,
+            skipped_count=0,
+            errors=errors,
+            output_directory=os.path.dirname(os.path.abspath(output_path)) if output_path else "",
+            excel_path=output_path if (output_path and os.path.isfile(output_path)) else None,
+            parent=self,
+        )
+        dialog.exec()
+
+    def start_photo_rename_export(self) -> None:
+        """
+        Memulai proses validasi dan ekspor baris rename foto biasa (Tahap 1):
         1. Kumpulkan data seluruh baris aktif.
         2. Jalankan validasi batch (validate_batch).
         3. Jika tidak valid, sorot baris yang bermasalah dan munculkan pesan error.
@@ -837,20 +1011,28 @@ class MainWindow(QMainWindow):
         self.exporter_thread.start()
 
     def cancel_export(self) -> None:
-        """Membatalkan proses ekspor yang sedang berlangsung."""
+        """Membatalkan proses ekspor atau pembuatan dokumen yang sedang berlangsung."""
+        if self.excel_generator_thread and self.excel_generator_thread.isRunning():
+            self.excel_generator_thread.cancel()
+            self.btn_cancel_export.setEnabled(False)
+            self.lbl_export_status.setText("Membatalkan pembuatan dokumen Excel...")
+            return
+
         if self.exporter_thread and self.exporter_thread.isRunning():
             self.exporter_thread.cancel()
             self.btn_cancel_export.setEnabled(False)
             self.lbl_export_status.setText("Membatalkan proses ekspor...")
 
     def _set_exporting_state(self, exporting: bool) -> None:
-        """Mengunci atau membuka kembali kontrol UI selama proses ekspor berlangsung."""
+        """Mengunci atau membuka kembali kontrol UI selama proses ekspor/generate berlangsung."""
         self.btn_export.setEnabled(not exporting)
         self.btn_import.setEnabled(not exporting)
         self.btn_add_row.setEnabled(not exporting)
         self.btn_remove_empty.setEnabled(not exporting)
         self.btn_reset.setEnabled(not exporting)
         self.btn_browse_dir.setEnabled(not exporting)
+        self.btn_select_site.setEnabled(not exporting)
+        self.btn_manage_template.setEnabled(not exporting)
         self.input_output_dir.setEnabled(not exporting)
         self.chk_overwrite.setEnabled(not exporting)
 
@@ -859,6 +1041,10 @@ class MainWindow(QMainWindow):
 
         for row in self.row_widgets:
             row.input_name.setEnabled(not exporting)
+            row.btn_select.setEnabled(not exporting)
+            row.btn_clear.setEnabled(not exporting)
+
+        for row in self.dynamic_rows:
             row.btn_select.setEnabled(not exporting)
             row.btn_clear.setEnabled(not exporting)
 
@@ -910,18 +1096,26 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def closeEvent(self, event) -> None:
-        """Menangani penutupan jendela saat proses ekspor masih berlangsung."""
-        if hasattr(self, "exporter_thread") and self.exporter_thread and self.exporter_thread.isRunning():
+        """Menangani penutupan jendela saat proses ekspor/generate masih berlangsung."""
+        is_running = (
+            (hasattr(self, "exporter_thread") and self.exporter_thread and self.exporter_thread.isRunning())
+            or (hasattr(self, "excel_generator_thread") and self.excel_generator_thread and self.excel_generator_thread.isRunning())
+        )
+        if is_running:
             reply = QMessageBox.question(
                 self,
-                "Ekspor Masih Berjalan",
-                "Proses ekspor masih berlangsung di latar belakang.\nApakah Anda yakin ingin membatalkan dan keluar?",
+                "Proses Masih Berjalan",
+                "Proses ekspor/generate masih berlangsung di latar belakang.\nApakah Anda yakin ingin membatalkan dan keluar?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
             if reply == QMessageBox.StandardButton.Yes:
-                self.exporter_thread.cancel()
-                self.exporter_thread.wait(2000)
+                if self.exporter_thread and self.exporter_thread.isRunning():
+                    self.exporter_thread.cancel()
+                    self.exporter_thread.wait(2000)
+                if self.excel_generator_thread and self.excel_generator_thread.isRunning():
+                    self.excel_generator_thread.cancel()
+                    self.excel_generator_thread.wait(2000)
                 event.accept()
             else:
                 event.ignore()

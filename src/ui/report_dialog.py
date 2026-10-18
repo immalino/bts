@@ -1,11 +1,12 @@
 """
-Photo Rename Studio - Modal Dialog Laporan Hasil Ekspor
+Photo Rename Studio - Modal Dialog Laporan Hasil Ekspor & Dokumen Excel
 """
 
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QDialog,
     QFrame,
@@ -14,6 +15,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QStyle,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -26,11 +28,12 @@ from src.utils.file_utils import open_folder_in_explorer
 
 class ReportDialog(QDialog):
     """
-    Dialog modal ringkasan laporan hasil ekspor foto.
+    Dialog modal ringkasan laporan hasil ekspor foto dan pembuatan dokumen Excel.
     
     Fitur:
     - Menampilkan kartu ringkasan: Total Diproses, Berhasil, Gagal, Dilewati.
     - Menampilkan tabel rincian kegagalan/error jika ada item yang gagal atau dilewati.
+    - Tombol 'Buka Dokumen Excel' untuk membuka file spreadsheet secara langsung.
     - Tombol 'Buka Folder Output' untuk membuka hasil ekspor di File Explorer.
     - Tombol 'Tutup' untuk kembali ke jendela utama.
     """
@@ -40,8 +43,9 @@ class ReportDialog(QDialog):
         success_count: int,
         fail_count: int,
         skipped_count: int,
-        errors: List[Dict[str, Any]],
-        output_directory: str,
+        errors: List[Union[Dict[str, Any], str]],
+        output_directory: str = "",
+        excel_path: Optional[str] = None,
         parent: Optional[QWidget] = None,
     ):
         super().__init__(parent)
@@ -49,14 +53,20 @@ class ReportDialog(QDialog):
         self.fail_count = fail_count
         self.skipped_count = skipped_count
         self.errors = errors
-        self.output_directory = output_directory
+        self.excel_path = excel_path
+
+        if not output_directory and excel_path:
+            self.output_directory = os.path.dirname(os.path.abspath(excel_path))
+        else:
+            self.output_directory = output_directory
 
         self._init_ui()
 
     def _init_ui(self) -> None:
-        self.setWindowTitle("Laporan Hasil Ekspor")
-        self.resize(680, 520)
-        self.setMinimumSize(540, 420)
+        title_text = "Laporan Hasil Dokumen Excel" if self.excel_path else "Laporan Hasil Ekspor"
+        self.setWindowTitle(title_text)
+        self.resize(700, 520)
+        self.setMinimumSize(560, 420)
         self.setModal(True)
 
         layout = QVBoxLayout(self)
@@ -67,7 +77,7 @@ class ReportDialog(QDialog):
         header_layout = QVBoxLayout()
         header_layout.setSpacing(4)
 
-        title_label = QLabel("📊 Ringkasan Hasil Ekspor", self)
+        title_label = QLabel(title_text, self)
         title_label.setStyleSheet(f"""
             font-size: 18px;
             font-weight: 700;
@@ -75,8 +85,12 @@ class ReportDialog(QDialog):
         """)
         header_layout.addWidget(title_label)
 
-        dir_display = self.output_directory if self.output_directory else "(Belum ditentukan)"
-        sub_label = QLabel(f"Folder tujuan: {dir_display}", self)
+        sub_info = (
+            f"Dokumen: {os.path.basename(self.excel_path)}"
+            if self.excel_path
+            else f"Folder tujuan: {self.output_directory or '(Belum ditentukan)'}"
+        )
+        sub_label = QLabel(sub_info, self)
         sub_label.setStyleSheet(f"""
             font-size: 12px;
             color: {ThemeColors.TEXT_MUTED};
@@ -110,7 +124,7 @@ class ReportDialog(QDialog):
             error_section = QVBoxLayout()
             error_section.setSpacing(6)
 
-            error_header = QLabel("⚠️ Rincian File yang Gagal / Bermasalah:", self)
+            error_header = QLabel("Rincian Item yang Gagal / Bermasalah:", self)
             error_header.setStyleSheet(f"""
                 font-size: 13px;
                 font-weight: 600;
@@ -121,7 +135,7 @@ class ReportDialog(QDialog):
             self.table_errors = QTableWidget(self)
             self.table_errors.setColumnCount(4)
             self.table_errors.setHorizontalHeaderLabels(
-                ["Baris", "File Sumber", "Nama Target", "Keterangan / Alasan Error"]
+                ["No", "File Sumber", "Nama Target", "Keterangan / Alasan Error"]
             )
             self.table_errors.setRowCount(len(self.errors))
             self.table_errors.setAlternatingRowColors(True)
@@ -138,15 +152,20 @@ class ReportDialog(QDialog):
             self.table_errors.setColumnWidth(2, 150)
 
             for row_idx, err in enumerate(self.errors):
-                row_num_str = str(err.get("row_index", "-"))
-                src_path = str(err.get("source_path", "-"))
-                src_name = os.path.basename(src_path) if src_path != "-" else "-"
-                target_name = str(err.get("target_filename", "-"))
-                reason = str(err.get("error", "-"))
+                if isinstance(err, dict):
+                    row_no = str(err.get("row_index", row_idx + 1))
+                    src_path = str(err.get("source_path", "-"))
+                    target_name = str(err.get("target_filename", "-"))
+                    reason = str(err.get("error", "-"))
+                else:
+                    row_no = str(row_idx + 1)
+                    src_path = "-"
+                    target_name = "-"
+                    reason = str(err)
 
-                item_row = QTableWidgetItem(row_num_str)
+                item_row = QTableWidgetItem(row_no)
                 item_row.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                item_src = QTableWidgetItem(src_name)
+                item_src = QTableWidgetItem(os.path.basename(src_path) if src_path != "-" else "-")
                 item_src.setToolTip(src_path)
                 item_tgt = QTableWidgetItem(target_name)
                 item_reason = QTableWidgetItem(reason)
@@ -171,16 +190,27 @@ class ReportDialog(QDialog):
             """)
             success_layout = QVBoxLayout(success_card)
             success_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            success_layout.setSpacing(10)
 
-            lbl_success_icon = QLabel("🎉", success_card)
-            lbl_success_icon.setStyleSheet("font-size: 32px;")
-            lbl_success_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            success_layout.addWidget(lbl_success_icon)
+            lbl_success_badge = QLabel("SUKSES", success_card)
+            lbl_success_badge.setStyleSheet("""
+                font-size: 13px;
+                font-weight: 700;
+                color: #166534;
+                background-color: #DCFCE7;
+                border: 1px solid #BBF7D0;
+                border-radius: 4px;
+                padding: 4px 14px;
+            """)
+            lbl_success_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            success_layout.addWidget(lbl_success_badge)
 
-            lbl_success_text = QLabel(
-                "Semua foto berhasil disalin dan diganti namanya tanpa kendala!",
-                success_card,
+            msg_text = (
+                "Dokumen Excel laporan foto berhasil digenerate dengan penataan gambar rapi!"
+                if self.excel_path
+                else "Semua foto berhasil disalin dan diganti namanya tanpa kendala!"
             )
+            lbl_success_text = QLabel(msg_text, success_card)
             lbl_success_text.setStyleSheet("""
                 font-size: 14px;
                 font-weight: 600;
@@ -195,7 +225,18 @@ class ReportDialog(QDialog):
         footer_layout = QHBoxLayout()
         footer_layout.setSpacing(10)
 
-        self.btn_open_folder = QPushButton("📁 Buka Folder Output", self)
+        # Tombol Buka Dokumen Excel (jika ada file Excel)
+        if self.excel_path and os.path.isfile(self.excel_path):
+            self.btn_open_excel = QPushButton("Buka Dokumen Excel", self)
+            self.btn_open_excel.setObjectName("PrimaryButton")
+            self.btn_open_excel.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+            self.btn_open_excel.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_open_excel.clicked.connect(self._on_open_excel_clicked)
+            footer_layout.addWidget(self.btn_open_excel)
+
+        # Tombol Buka Folder Output
+        self.btn_open_folder = QPushButton("Buka Folder Output", self)
+        self.btn_open_folder.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton))
         self.btn_open_folder.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_open_folder.clicked.connect(self._on_open_folder_clicked)
         footer_layout.addWidget(self.btn_open_folder)
@@ -203,7 +244,7 @@ class ReportDialog(QDialog):
         footer_layout.addStretch(1)
 
         self.btn_close = QPushButton("Tutup", self)
-        self.btn_close.setObjectName("PrimaryButton")
+        self.btn_close.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCloseButton))
         self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_close.setDefault(True)
         self.btn_close.clicked.connect(self.accept)
@@ -253,21 +294,37 @@ class ReportDialog(QDialog):
 
         return card
 
-    def _on_open_folder_clicked(self) -> None:
-        """Handler tombol untuk membuka folder output di File Explorer."""
-        if not self.output_directory or not os.path.isdir(self.output_directory):
+    def _on_open_excel_clicked(self) -> None:
+        """Handler tombol untuk membuka dokumen Excel hasil secara langsung."""
+        if not self.excel_path or not os.path.isfile(self.excel_path):
             QMessageBox.warning(
                 self,
-                "Folder Tidak Ditemukan",
-                f"Direktori output tidak ditemukan atau belum valid:\n{self.output_directory}",
+                "File Tidak Ditemukan",
+                f"Dokumen Excel tidak ditemukan:\n{self.excel_path}",
             )
             return
 
-        success = open_folder_in_explorer(self.output_directory)
+        file_url = QUrl.fromLocalFile(os.path.abspath(self.excel_path))
+        QDesktopServices.openUrl(file_url)
+
+    def _on_open_folder_clicked(self) -> None:
+        """Handler tombol untuk membuka folder output di File Explorer."""
+        target_dir = self.output_directory
+        if not target_dir and self.excel_path:
+            target_dir = os.path.dirname(os.path.abspath(self.excel_path))
+
+        if not target_dir or not os.path.isdir(target_dir):
+            QMessageBox.warning(
+                self,
+                "Folder Tidak Ditemukan",
+                f"Direktori output tidak ditemukan atau belum valid:\n{target_dir}",
+            )
+            return
+
+        success = open_folder_in_explorer(target_dir)
         if not success:
             QMessageBox.warning(
                 self,
                 "Gagal Membuka Folder",
-                f"Tidak dapat membuka direktori output:\n{self.output_directory}",
+                f"Tidak dapat membuka direktori output:\n{target_dir}",
             )
-

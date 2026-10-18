@@ -910,7 +910,7 @@ Membangun sistem manajemen proyek/site (buat proyek site baru, buka riwayat site
 
 #### 🤖 Prompt untuk AI Agent
 ```text
-Halo Agent, tolong kerjakan SESI 11 dari file IMPLEMENTATION.md untuk proyek my-bts.
+`Halo Agent, tolong kerjakan SESI 11 dari file IMPLEMENTATION.md untuk proyek my-bts.
 
 Tugas yang harus diselesaikan:
 1. Buat widget baris foto dinamis di src/ui/dynamic_row.py yang menampilkan label field kustom, info sheet/sel, thumbnail, dan dropzone.
@@ -920,7 +920,7 @@ Tugas yang harus diselesaikan:
 5. Buat git commit:
    git add .
    git commit -m "feat(sesi-11): ui project manager dan workspace foto dinamis berbasis template"
-6. Tandai checklist Sesi 11 dengan [x] di IMPLEMENTATION.md.
+6. Tandai checklist Sesi 11 dengan [x] di IMPLEMENTATION.md.`
 ```
 
 #### 💾 Perintah Git Commit
@@ -952,21 +952,21 @@ Menghubungkan tombol aksi "Generate Dokumen Excel" di UI dengan worker thread `E
 - `README.md` (pembaruan dokumentasi alur Document Control BTS Telkom)
 
 #### 📋 Checklist Tugas Sesi 12
-- [ ] Hubungkan tombol "🚀 Generate Dokumen Excel" pada footer MainWindow:
+- [x] Hubungkan tombol "🚀 Generate Dokumen Excel" pada footer MainWindow:
   - Validasi keberadaan file template dan apakah minimal ada 1 foto yang dimasukkan.
   - Konfirmasi pemilihan lokasi output dokumen Excel (default: `output/Laporan_<SiteName>_<Tanggal>.xlsx`).
   - Mulai `ExcelGeneratorThread` di background.
   - Perbarui progress bar dan label status secara berkala.
-- [ ] Tampilkan `ReportDialog` setelah selesai:
+- [x] Tampilkan `ReportDialog` setelah selesai:
   - Statistik foto yang berhasil disisipkan dan dilewati/gagal.
   - Tombol aksi: "Buka Dokumen Excel" (`QDesktopServices.openUrl`) dan "Buka Folder Hasil".
-- [ ] Buat file test end-to-end `tests/test_e2e_excel_flow.py`.
-- [ ] Perbarui `README.md` dengan panduan penggunaan Tahap 2 (Document Control BTS).
-- [ ] Jalankan audit test suite lengkap:
+- [x] Buat file test end-to-end `tests/test_e2e_excel_flow.py`.
+- [x] Perbarui `README.md` dengan panduan penggunaan Tahap 2 (Document Control BTS).
+- [x] Jalankan audit test suite lengkap:
   ```bash
   ./venv/bin/pytest -v
   ```
-- [ ] Pastikan seluruh test lolos 100% dan aplikasi bebas bug.
+- [x] Pastikan seluruh test lolos 100% dan aplikasi bebas bug.
 
 #### 🧪 Cara Verifikasi Sesi 12
 ```bash

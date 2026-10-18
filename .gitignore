@@ -51,3 +51,6 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# Local Data & Output
+data/
+output/
