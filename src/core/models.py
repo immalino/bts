@@ -68,6 +68,7 @@ class TemplateConfig:
     name: str
     template_file_path: str
     fields: List[PhotoFieldConfig] = field(default_factory=list)
+    output_filename_pattern: str = ""
     created_at: str = ""
     updated_at: str = ""
 
@@ -85,6 +86,7 @@ class TemplateConfig:
             "name": self.name,
             "template_file_path": self.template_file_path,
             "fields": [f.to_dict() for f in self.fields],
+            "output_filename_pattern": self.output_filename_pattern,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -102,6 +104,7 @@ class TemplateConfig:
             name=str(data.get("name", "")),
             template_file_path=str(data.get("template_file_path", "")),
             fields=parsed_fields,
+            output_filename_pattern=str(data.get("output_filename_pattern", "")),
             created_at=str(data.get("created_at", "")),
             updated_at=str(data.get("updated_at", "")),
         )

@@ -51,8 +51,8 @@ class AddDocumentDialog(QDialog):
 
     def _init_ui(self) -> None:
         self.setWindowTitle("Tambah Template Dokumen ke Site")
-        self.resize(460, 240)
-        self.setMinimumSize(400, 220)
+        self.resize(520, 340)
+        self.setMinimumSize(460, 300)
         self.setModal(True)
 
         layout = QVBoxLayout(self)

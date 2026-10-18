@@ -71,8 +71,8 @@ class FieldEditDialog(QDialog):
     def _init_ui(self) -> None:
         title = "Edit Field" if self.field_config else "Tambah Field Baru"
         self.setWindowTitle(title)
-        self.resize(500, 520)
-        self.setMinimumSize(440, 460)
+        self.resize(540, 580)
+        self.setMinimumSize(480, 520)
         self.setModal(True)
 
         if APP_ICON_PNG.is_file():
@@ -478,8 +478,8 @@ class TemplateEditorDialog(QDialog):
     def _init_ui(self) -> None:
         title = "Edit Template Laporan" if self.template else "Buat Template Laporan Baru"
         self.setWindowTitle(title)
-        self.resize(720, 560)
-        self.setMinimumSize(600, 480)
+        self.resize(840, 650)
+        self.setMinimumSize(740, 540)
         self.setModal(True)
 
         if APP_ICON_PNG.is_file():
@@ -502,7 +502,7 @@ class TemplateEditorDialog(QDialog):
         header_layout.addWidget(lbl_title)
 
         lbl_subtitle = QLabel(
-            "Konfigurasikan template Excel induk dan daftar field foto yang akan ditanamkan",
+            "Konfigurasikan template Excel induk, penamaan file hasil, dan daftar field foto/teks",
             self,
         )
         lbl_subtitle.setStyleSheet(f"""
@@ -566,8 +566,27 @@ class TemplateEditorDialog(QDialog):
         self.lbl_sheet_status.setStyleSheet(f"font-size: 11px; color: {ThemeColors.TEXT_MUTED};")
         self.lbl_sheet_status.setWordWrap(True)
         file_layout.addWidget(self.lbl_sheet_status)
-
         meta_layout.addLayout(file_layout)
+
+        # Input Format Pola Nama File Output (Opsional)
+        pattern_layout = QVBoxLayout()
+        pattern_layout.setSpacing(4)
+        lbl_pattern = QLabel("Format Nama File Output (Opsional):", meta_card)
+        lbl_pattern.setStyleSheet(f"font-weight: 600; color: {ThemeColors.TEXT}; font-size: 12px;")
+        pattern_layout.addWidget(lbl_pattern)
+
+        self.edit_output_filename_pattern = QLineEdit(meta_card)
+        self.edit_output_filename_pattern.setPlaceholderText("Contoh: Laporan_{site_name}_{date} atau {template_name}_{site_name}_{Nama Site}")
+        pattern_layout.addWidget(self.edit_output_filename_pattern)
+
+        lbl_pattern_hint = QLabel(
+            "Variabel tersedia: {site_name}, {template_name}, {date}, {datetime}, serta label field teks (contoh: {Nama Site})",
+            meta_card,
+        )
+        lbl_pattern_hint.setStyleSheet(f"font-size: 11px; color: {ThemeColors.TEXT_MUTED};")
+        pattern_layout.addWidget(lbl_pattern_hint)
+        meta_layout.addLayout(pattern_layout)
+
         layout.addWidget(meta_card)
 
         # 3. Fields Section
@@ -677,6 +696,9 @@ class TemplateEditorDialog(QDialog):
         if self.template:
             self.edit_name.setText(self.template.name)
             self.edit_file_path.setText(self.template.template_file_path)
+            self.edit_output_filename_pattern.setText(
+                getattr(self.template, "output_filename_pattern", "")
+            )
             self.load_sheet_names(self.template.template_file_path)
 
         self._refresh_fields_table()
@@ -962,6 +984,7 @@ class TemplateEditorDialog(QDialog):
 
         name = self.edit_name.text().strip()
         file_path = self.edit_file_path.text().strip()
+        output_pattern = self.edit_output_filename_pattern.text().strip()
         now_iso = datetime.now().isoformat()
 
         if self.template:
@@ -976,6 +999,7 @@ class TemplateEditorDialog(QDialog):
             name=name,
             template_file_path=file_path,
             fields=list(self.fields),
+            output_filename_pattern=output_pattern,
             created_at=created_at,
             updated_at=now_iso,
         )
@@ -1017,8 +1041,8 @@ class TemplateManagerDialog(QDialog):
 
     def _init_ui(self) -> None:
         self.setWindowTitle("Manajemen Template Laporan")
-        self.resize(760, 500)
-        self.setMinimumSize(620, 400)
+        self.resize(840, 580)
+        self.setMinimumSize(720, 480)
         self.setModal(True)
 
         if APP_ICON_PNG.is_file():

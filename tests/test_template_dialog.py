@@ -18,6 +18,8 @@ from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
 from src.core.models import PhotoFieldConfig, TemplateConfig
 from src.core.storage import StorageManager
+from src.ui.document_tabs import AddDocumentDialog
+from src.ui.project_dialog import NewProjectDialog, ProjectManagerDialog
 from src.ui.template_dialog import (
     FieldEditDialog,
     TemplateEditorDialog,
@@ -520,5 +522,69 @@ def test_template_editor_mixed_fields_table(qapp, sample_xlsx: str):
     assert editor.table_fields.item(1, 7).text() == "-"
 
     editor.close()
+
+
+def test_template_editor_output_filename_pattern_save_and_load(qapp, sample_xlsx: str, tmp_path: Path):
+    """Memverifikasi TemplateEditorDialog menyimpan dan memuat kembali pola nama file output."""
+    storage = StorageManager(base_dir=tmp_path / "storage_test")
+
+    # 1. Buat template baru dengan pola kustom
+    editor = TemplateEditorDialog(storage=storage)
+    editor.edit_name.setText("Template Pola Kustom")
+    editor.edit_file_path.setText(sample_xlsx)
+    editor.edit_output_filename_pattern.setText("Laporan_{template_name}_{site_name}_{date}")
+    editor.fields = [
+        PhotoFieldConfig("f1", "Foto Antenna", "Antenna", "B5", field_type="photo")
+    ]
+
+    editor._on_save_template_clicked()
+    saved = editor.get_template_config()
+    assert saved is not None
+    assert saved.output_filename_pattern == "Laporan_{template_name}_{site_name}_{date}"
+    editor.close()
+
+    # 2. Muat kembali template yang tersimpan ke editor
+    loaded = storage.load_template(saved.template_id)
+    assert loaded.output_filename_pattern == "Laporan_{template_name}_{site_name}_{date}"
+
+    editor2 = TemplateEditorDialog(template=loaded, storage=storage)
+    assert editor2.edit_output_filename_pattern.text() == "Laporan_{template_name}_{site_name}_{date}"
+    editor2.close()
+
+
+def test_dialog_dimensions_minimum_size(qapp, tmp_path: Path):
+    """Memverifikasi batas ukuran minimum seluruh window dialog tidak terlalu kecil (tidak gepeng)."""
+    storage = StorageManager(base_dir=tmp_path / "storage_dim")
+
+    dlg_new_proj = NewProjectDialog(storage=storage)
+    assert dlg_new_proj.minimumWidth() >= 480
+    assert dlg_new_proj.minimumHeight() >= 320
+    dlg_new_proj.close()
+
+    dlg_proj_mgr = ProjectManagerDialog(storage=storage)
+    assert dlg_proj_mgr.minimumWidth() >= 700
+    assert dlg_proj_mgr.minimumHeight() >= 450
+    dlg_proj_mgr.close()
+
+    dlg_add_doc = AddDocumentDialog(storage=storage)
+    assert dlg_add_doc.minimumWidth() >= 450
+    assert dlg_add_doc.minimumHeight() >= 280
+    dlg_add_doc.close()
+
+    dlg_tpl_mgr = TemplateManagerDialog(storage=storage)
+    assert dlg_tpl_mgr.minimumWidth() >= 700
+    assert dlg_tpl_mgr.minimumHeight() >= 450
+    dlg_tpl_mgr.close()
+
+    dlg_tpl_editor = TemplateEditorDialog(storage=storage)
+    assert dlg_tpl_editor.minimumWidth() >= 700
+    assert dlg_tpl_editor.minimumHeight() >= 500
+    dlg_tpl_editor.close()
+
+    dlg_field = FieldEditDialog()
+    assert dlg_field.minimumWidth() >= 460
+    assert dlg_field.minimumHeight() >= 500
+    dlg_field.close()
+
 
 

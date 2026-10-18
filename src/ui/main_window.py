@@ -44,6 +44,7 @@ from src.ui.report_dialog import ReportDialog
 from src.ui.row_widget import RowStatus, RowWidget
 from src.ui.styles import ThemeManager, ThemePalette
 from src.ui.template_dialog import TemplateManagerDialog
+from src.utils.excel_utils import format_output_filename
 from src.utils.file_utils import open_folder_in_explorer, reveal_in_explorer, split_filename_and_ext
 
 
@@ -1314,12 +1315,14 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, title, msg)
             return
 
-        # Tentukan nama dan lokasi file output default
-        site_slug = "BTS_Site"
-        if self.current_project and self.current_project.site_name.strip():
-            site_slug = re.sub(r'[\\/*?:"<>|\s]+', "_", self.current_project.site_name.strip())
-        date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_name = f"Laporan_{site_slug}_{date_str}.xlsx"
+        # Tentukan nama dan lokasi file output default berdasarkan pola penamaan template
+        pattern = getattr(self.current_template, "output_filename_pattern", "")
+        default_name = format_output_filename(
+            pattern=pattern,
+            project_data=self.current_project,
+            template=self.current_template,
+            text_assignments=filled_text_assignments,
+        )
 
         if self.input_output_dir.text().strip() and os.path.isdir(self.input_output_dir.text().strip()):
             initial_dir = self.input_output_dir.text().strip()

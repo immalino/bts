@@ -371,3 +371,68 @@ def test_e2e_mixed_photo_and_text_excel_generation(
     window.close()
 
 
+def test_e2e_template_output_filename_pattern_applied(
+    qapp,
+    dummy_excel_template: str,
+    dummy_photos: tuple[str, str],
+    tmp_path: Path,
+    monkeypatch,
+):
+    """
+    Skenario E2E: Verifikasi bahwa pola penamaan file yang dikonfigurasi di template
+    otomatis diterapkan ke dialog simpan saat user melakukan generate dokumen Excel.
+    """
+    storage = StorageManager(base_dir=tmp_path / "storage_pattern_e2e")
+    photo1, _ = dummy_photos
+
+    fields = [
+        PhotoFieldConfig("fld_p1", "Foto Antenna", "Antenna", "B5", field_type="photo"),
+        PhotoFieldConfig("fld_site_id", "ID Site BTS", "Antenna", "A1", field_type="text"),
+    ]
+
+    template = TemplateConfig(
+        template_id="tpl_pattern",
+        name="Template Telkomsel CME",
+        template_file_path=dummy_excel_template,
+        fields=fields,
+        output_filename_pattern="Laporan_{template_name}_{site_name}_{ID Site BTS}_{date}",
+    )
+    storage.save_template(template)
+
+    project = ProjectData(
+        project_id="proj_pattern",
+        site_name="JAKARTA-SELATAN-01",
+        template_id="tpl_pattern",
+    )
+    storage.save_project(project)
+
+    window = MainWindow(storage=storage)
+    window.set_project(project)
+
+    # Isi foto dan teks pada baris dinamis
+    window.dynamic_rows[0].set_photo(photo1)
+    window.dynamic_rows[1].set_text("BTS-7788")
+
+    captured_save_path = []
+
+    def mock_get_save_filename(parent, title, default_path, filter_str):
+        captured_save_path.append(default_path)
+        return (default_path, filter_str)
+
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", mock_get_save_filename)
+    monkeypatch.setattr(ReportDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
+
+    window.start_export()
+    assert window.excel_generator_thread is not None
+    window.excel_generator_thread.wait(5000)
+    QCoreApplication.processEvents()
+
+    assert len(captured_save_path) == 1
+    suggested_filename = os.path.basename(captured_save_path[0])
+    assert suggested_filename.startswith("Laporan_Template_Telkomsel_CME_JAKARTA-SELATAN-01_BTS-7788_")
+    assert suggested_filename.endswith(".xlsx")
+
+    window.close()
+
+
+

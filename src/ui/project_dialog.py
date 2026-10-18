@@ -63,8 +63,8 @@ class NewProjectDialog(QDialog):
 
     def _init_ui(self) -> None:
         self.setWindowTitle("Buat Proyek Site Baru")
-        self.resize(480, 280)
-        self.setMinimumSize(420, 240)
+        self.resize(560, 380)
+        self.setMinimumSize(500, 340)
         self.setModal(True)
 
         if APP_ICON_PNG.is_file():
@@ -266,8 +266,8 @@ class ProjectManagerDialog(QDialog):
 
     def _init_ui(self) -> None:
         self.setWindowTitle("Manajemen Proyek Site")
-        self.resize(780, 480)
-        self.setMinimumSize(620, 380)
+        self.resize(860, 580)
+        self.setMinimumSize(720, 480)
         self.setModal(True)
 
         if APP_ICON_PNG.is_file():

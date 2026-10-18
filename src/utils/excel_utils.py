@@ -4,8 +4,11 @@ Fungsi pembantu untuk kalkulasi dimensi sel & merged cell di openpyxl
 serta kalkulasi resize proporsional gambar (auto-fit cell).
 """
 
+from datetime import datetime
+import os
 from pathlib import Path
-from typing import List, Tuple, Union
+import re
+from typing import Any, Dict, List, Optional, Tuple, Union
 import openpyxl
 from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
 from openpyxl.drawing.xdr import XDRPositiveSize2D
@@ -299,4 +302,186 @@ def get_sheet_names_from_excel(file_path: Union[str, Path]) -> List[str]:
         if isinstance(err, (FileNotFoundError, ValueError)):
             raise
         raise ValueError(f"Gagal membaca sheet dari file Excel '{file_path}': {err}") from err
+
+
+def sanitize_excel_output(file_path: str) -> None:
+    """
+    Membersihkan dan menstandarkan arsip berkas Excel (.xlsx) pasca penyimpanan openpyxl:
+    1. Menghapus 'xl/calcChain.xml' usang dari arsip dan referensinya di workbook.xml.rels
+       serta [Content_Types].xml. Hal ini mencegah peringatan korupsi kalkulasi rantai Excel
+       ('We found a problem with some content... Removed Records: Formula from /xl/calcChain.xml').
+    2. Menstandarkan tag formula kosong pada worksheet xml: mengubah '<v />' atau '<v></v>'
+       menjadi '<v>0</v>'. OpenXML strict validator pada Microsoft Excel menolak '<v />' kosong
+       di dalam tag formula yang sering memicu error repair dan penghapusan border/rumus.
+
+    Args:
+        file_path: Path absolut atau relatif ke berkas Excel yang baru disimpan.
+    """
+    if not file_path or not os.path.isfile(file_path):
+        return
+
+    import tempfile
+    import zipfile
+
+    temp_path = file_path + ".tmp_clean"
+    try:
+        with zipfile.ZipFile(file_path, "r") as zin, zipfile.ZipFile(
+            temp_path, "w", compression=zipfile.ZIP_DEFLATED
+        ) as zout:
+            for item in zin.infolist():
+                # Lewati calcChain.xml agar Excel membuat calculation chain baru secara dinamis
+                if item.filename == "xl/calcChain.xml":
+                    continue
+
+                content = zin.read(item.filename)
+
+                # Hapus relasi ke calcChain di workbook.xml.rels
+                if item.filename == "xl/_rels/workbook.xml.rels":
+                    text = content.decode("utf-8")
+                    text = re.sub(
+                        r'<Relationship[^>]*Target=[\"\']calcChain\.xml[\"\'][^>]*/>',
+                        "",
+                        text,
+                    )
+                    content = text.encode("utf-8")
+
+                # Hapus override calcChain di [Content_Types].xml
+                elif item.filename == "[Content_Types].xml":
+                    text = content.decode("utf-8")
+                    text = re.sub(
+                        r'<Override[^>]*PartName=[\"\']/xl/calcChain\.xml[\"\'][^>]*/>',
+                        "",
+                        text,
+                    )
+                    content = text.encode("utf-8")
+
+                # Standarkan tag nilai formula kosong pada worksheet
+                elif item.filename.startswith("xl/worksheets/sheet") and item.filename.endswith(".xml"):
+                    text = content.decode("utf-8")
+                    text = re.sub(r'<v\s*/>', '<v>0</v>', text)
+                    text = re.sub(r'<v>\s*</v>', '<v>0</v>', text)
+                    content = text.encode("utf-8")
+
+                zout.writestr(item, content)
+
+        os.replace(temp_path, file_path)
+    except Exception:
+        # Jika terjadi kendala saat pasca-proses, pertahankan file asli dan bersihkan temp
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+
+
+def format_output_filename(
+    pattern: str,
+    project_data: Optional[Any] = None,
+    template: Optional[Any] = None,
+    text_assignments: Optional[Dict[str, str]] = None,
+    custom_vars: Optional[Dict[str, str]] = None,
+) -> str:
+    """
+    Menghasilkan nama file dokumen output laporan Excel (.xlsx) berdasarkan pola format
+    yang ditentukan di template dengan dukungan substitusi variabel dinamis.
+
+    Variabel standar yang didukung:
+    - {site_name} / {site}: Nama/ID site proyek (dibersihkan dari karakter ilegal).
+    - {template_name}: Nama konfigurasi template.
+    - {date}: Tanggal hari ini format YYYYMMDD (contoh: 20261018).
+    - {datetime}: Tanggal & jam format YYYYMMDD_HHMMSS.
+    - {doc_name}: Nama sub-dokumen aktif jika ada.
+    - {nama_field} / {field_id}: Nilai dari field teks template (contoh: {Nama Site}, {Nomor SPK}).
+
+    Args:
+        pattern: String format pola (contoh: "{template_name}_{site_name}_{Nama Site}_{date}").
+        project_data: Objek ProjectData jika ada.
+        template: Objek TemplateConfig jika ada.
+        text_assignments: Dict pemetaan field_id -> teks yang diinputkan pengguna.
+        custom_vars: Dict variabel tambahan jika ada.
+
+    Returns:
+        str: Nama file berekstensi .xlsx yang valid dan aman untuk sistem berkas OS.
+    """
+    now = datetime.now()
+    date_str = now.strftime("%Y%m%d")
+    datetime_str = now.strftime("%Y%m%d_%H%M%S")
+
+    # Siapkan variabel standar
+    site_raw = project_data.site_name.strip() if project_data and getattr(project_data, "site_name", None) else ""
+    site_slug = re.sub(r'[\\/*?:"<>|\s]+', "_", site_raw) if site_raw else "BTS_Site"
+
+    template_raw = template.name.strip() if template and getattr(template, "name", None) else ""
+    template_slug = re.sub(r'[\\/*?:"<>|\s]+', "_", template_raw) if template_raw else "Laporan"
+
+    doc_raw = ""
+    if project_data and hasattr(project_data, "get_active_document"):
+        active_doc = project_data.get_active_document()
+        if active_doc and getattr(active_doc, "name", ""):
+            doc_raw = active_doc.name.strip()
+    doc_slug = re.sub(r'[\\/*?:"<>|\s]+', "_", doc_raw) if doc_raw else ""
+
+    # Kumpulkan nilai variabel ke dalam lookup dictionary (case-insensitive)
+    var_map: Dict[str, str] = {
+        "site_name": site_slug,
+        "site": site_slug,
+        "template_name": template_slug,
+        "template": template_slug,
+        "date": date_str,
+        "datetime": datetime_str,
+        "doc_name": doc_slug,
+        "doc": doc_slug,
+    }
+
+    # Variabel dari field teks template
+    combined_texts: Dict[str, str] = {}
+    if project_data and getattr(project_data, "text_assignments", None):
+        combined_texts.update(project_data.text_assignments)
+    if text_assignments:
+        combined_texts.update(text_assignments)
+
+    if template and getattr(template, "fields", None):
+        for fld in template.fields:
+            val = combined_texts.get(fld.field_id, "")
+            if not val and getattr(fld, "default_text", ""):
+                val = fld.default_text
+            clean_val = re.sub(r'[\\/*?:"<>|\s]+', "_", str(val).strip())
+            # Simpan berdasarkan field_id dan label
+            var_map[fld.field_id.lower()] = clean_val
+            var_map[fld.label.strip().lower()] = clean_val
+            normalized_label = re.sub(r"\s+", "_", fld.label.strip().lower())
+            var_map[normalized_label] = clean_val
+
+    # Tambahkan custom_vars jika ada
+    if custom_vars:
+        for k, v in custom_vars.items():
+            clean_v = re.sub(r'[\\/*?:"<>|\s]+', "_", str(v).strip())
+            var_map[k.lower()] = clean_v
+
+    raw_pattern = pattern.strip() if pattern else ""
+    if not raw_pattern:
+        # Pola fallback standar
+        return f"Laporan_{site_slug}_{datetime_str}.xlsx"
+
+    # Substitusi placeholder {placeholder}
+    def _replace_match(match: re.Match) -> str:
+        key = match.group(1).strip().lower()
+        return var_map.get(key, "")
+
+    formatted_name = re.sub(r"\{([^}]+)\}", _replace_match, raw_pattern)
+
+    # Bersihkan karakter terlarang sistem berkas
+    clean_name = re.sub(r'[\\/*?:"<>|]+', "_", formatted_name)
+    # Hapus garis bawah berulang dan spasi di ujung
+    clean_name = re.sub(r"_+", "_", clean_name).strip("_. ")
+
+    # Jika nama kosong setelah substitusi, gunakan default fallback
+    if not clean_name:
+        clean_name = f"Laporan_{site_slug}_{datetime_str}"
+
+    if not clean_name.lower().endswith(".xlsx"):
+        clean_name += ".xlsx"
+
+    return clean_name
+
 

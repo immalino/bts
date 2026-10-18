@@ -19,6 +19,7 @@ from src.utils.excel_utils import (
     calculate_fitted_dimensions,
     calculate_image_anchor,
     get_cell_dimensions,
+    sanitize_excel_output,
 )
 
 
@@ -313,7 +314,22 @@ class ExcelGeneratorThread(QThread):
                 out_dir = os.path.dirname(os.path.abspath(self.output_path))
                 if out_dir:
                     os.makedirs(out_dir, exist_ok=True)
+
+                # Pastikan perhitungan formula dihitung otomatis saat dibuka di Excel
+                try:
+                    if hasattr(wb, "calculation"):
+                        wb.calculation.calcMode = "auto"
+                        wb.calculation.fullCalcOnLoad = True
+                    if hasattr(wb, "calcPr"):
+                        wb.calcPr.fullCalcOnLoad = True
+                except Exception:
+                    pass
+
                 wb.save(self.output_path)
+
+                # Sanitasi struktur OpenXML: bersihkan calcChain usang dan standarkan nilai formula
+                # agar Excel tidak memicu repair recovery (yang menyebabkan border & rumus terhapus)
+                sanitize_excel_output(self.output_path)
             except Exception as ex:
                 err_msg = f"Gagal menyimpan file Excel ke '{self.output_path}': {ex}"
                 errors.append(err_msg)

@@ -22,7 +22,9 @@ from src.core.models import PhotoFieldConfig, ProjectData, TemplateConfig
 from src.utils.excel_utils import (
     calculate_fitted_dimensions,
     calculate_image_anchor,
+    format_output_filename,
     get_cell_dimensions,
+    sanitize_excel_output,
 )
 
 
@@ -664,4 +666,212 @@ class TestExcelGeneratorThread:
         assert wb["Tower"]["A1"].value == "Default Tower Note"
         assert len(wb["Antenna"]._images) == 1
         wb.close()
+
+    def test_sanitize_excel_output_removes_calcchain_and_empty_v_tags(self, tmp_path: Path):
+        """Memverifikasi sanitize_excel_output menghapus calcChain.xml dan memperbaiki empty <v />."""
+        import zipfile
+        from openpyxl.styles import Border, Side
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws["A1"] = 100
+        ws["A2"] = 200
+        ws["A3"] = "=SUM(A1:A2)"
+        thin = Side(border_style="thin", color="000000")
+        ws["A3"].border = Border(top=thin, bottom=thin)
+
+        raw_file = str(tmp_path / "raw_with_calcchain.xlsx")
+        wb.save(raw_file)
+
+        # Sisipkan tiruan calcChain.xml ke arsip zip untuk simulasi file buatan Microsoft Excel
+        mod_file = str(tmp_path / "simulated_excel.xlsx")
+        with zipfile.ZipFile(raw_file, "r") as zin, zipfile.ZipFile(mod_file, "w") as zout:
+            for item in zin.infolist():
+                data = zin.read(item.filename)
+                if item.filename == "xl/_rels/workbook.xml.rels":
+                    data = data.replace(
+                        b"</Relationships>",
+                        b'<Relationship Id="rIdCalc" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain" Target="calcChain.xml"/></Relationships>',
+                    )
+                elif item.filename == "[Content_Types].xml":
+                    data = data.replace(
+                        b"</Types>",
+                        b'<Override PartName="/xl/calcChain.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml"/></Types>',
+                    )
+                zout.writestr(item, data)
+            zout.writestr("xl/calcChain.xml", b"<calcChain><c r='A3' i='1'/></calcChain>")
+
+        # Jalankan sanitasi
+        sanitize_excel_output(mod_file)
+
+        # Periksa arsip zip setelah sanitasi
+        with zipfile.ZipFile(mod_file, "r") as zcheck:
+            namelist = zcheck.namelist()
+            assert "xl/calcChain.xml" not in namelist
+
+            rels_text = zcheck.read("xl/_rels/workbook.xml.rels").decode("utf-8")
+            assert "calcChain.xml" not in rels_text
+
+            types_text = zcheck.read("[Content_Types].xml").decode("utf-8")
+            assert "calcChain.xml" not in types_text
+
+            sheet_text = zcheck.read("xl/worksheets/sheet1.xml").decode("utf-8")
+            assert "<v />" not in sheet_text
+            assert "<v></v>" not in sheet_text
+
+    def test_excel_generator_preserves_formulas_and_borders(self, tmp_path: Path, sample_photos: dict):
+        """Memverifikasi bahwa file template yang memiliki rumus & border sel tetap utuh setelah generate."""
+        from openpyxl.styles import Border, Side
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "LaporanBTS"
+
+        thin = Side(border_style="thin", color="FF0000")
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        # Buat tabel dengan border dan rumus
+        ws["A1"] = "Item"
+        ws["B1"] = "Jumlah"
+        ws["A1"].border = border
+        ws["B1"].border = border
+
+        ws["A2"] = "Perangkat 1"
+        ws["B2"] = 10
+        ws["A2"].border = border
+        ws["B2"].border = border
+
+        ws["A3"] = "Perangkat 2"
+        ws["B3"] = 20
+        ws["A3"].border = border
+        ws["B3"].border = border
+
+        ws["A4"] = "Total"
+        ws["B4"] = "=SUM(B2:B3)"
+        ws["A4"].border = border
+        ws["B4"].border = border
+
+        # Cell anchor untuk foto di B6
+        ws.column_dimensions["B"].width = 25.0
+        ws.row_dimensions[6].height = 40.0
+
+        tpl_file = str(tmp_path / "template_with_borders.xlsx")
+        wb.save(tpl_file)
+        wb.close()
+
+        out_file = str(tmp_path / "out_preserved.xlsx")
+        field = PhotoFieldConfig(
+            field_id="p1",
+            label="Foto Site",
+            sheet_name="LaporanBTS",
+            cell_anchor="B6",
+        )
+
+        thread = ExcelGeneratorThread(
+            template=tpl_file,
+            output_path=out_file,
+            fields=[field],
+            photo_assignments={"p1": sample_photos["p1"]},
+        )
+        thread.run()
+
+        assert os.path.isfile(out_file)
+
+        # Periksa workbook hasil
+        wb_res = openpyxl.load_workbook(out_file)
+        ws_res = wb_res["LaporanBTS"]
+
+        # 1. Verifikasi border tetap ada
+        assert ws_res["A1"].border.left.style == "thin"
+        assert ws_res["B1"].border.right.style == "thin"
+        assert ws_res["A4"].border.top.style == "thin"
+        assert ws_res["B4"].border.bottom.style == "thin"
+
+        # 2. Verifikasi rumus tetap ada
+        assert ws_res["B4"].value == "=SUM(B2:B3)"
+
+        # 3. Verifikasi calculation properties terpasang
+        if hasattr(wb_res, "calculation"):
+            assert wb_res.calculation.fullCalcOnLoad is True
+            assert wb_res.calculation.calcMode == "auto"
+
+        wb_res.close()
+
+
+class TestFormatOutputFilename:
+    def test_default_fallback_when_empty_pattern(self):
+        proj = ProjectData(project_id="p1", site_name="Site Malang 01", template_id="t1")
+        tpl = TemplateConfig(template_id="t1", name="Template CME", template_file_path="")
+
+        fn = format_output_filename("", project_data=proj, template=tpl)
+        assert fn.startswith("Laporan_Site_Malang_01_")
+        assert fn.endswith(".xlsx")
+
+    def test_standard_variables_substitution(self):
+        proj = ProjectData(project_id="p1", site_name="JKT-42", template_id="t1")
+        tpl = TemplateConfig(template_id="t1", name="ATP Telkomsel", template_file_path="")
+
+        fn = format_output_filename(
+            "Laporan_{site_name}_{template_name}_{date}",
+            project_data=proj,
+            template=tpl,
+        )
+        assert fn.startswith("Laporan_JKT-42_ATP_Telkomsel_")
+        assert fn.endswith(".xlsx")
+
+    def test_field_variables_substitution(self):
+        field1 = PhotoFieldConfig(
+            field_id="fld_nama_site",
+            label="Nama Site",
+            sheet_name="S1",
+            cell_anchor="A1",
+            field_type="text",
+        )
+        field2 = PhotoFieldConfig(
+            field_id="fld_spk",
+            label="Nomor SPK",
+            sheet_name="S1",
+            cell_anchor="A2",
+            field_type="text",
+        )
+        tpl = TemplateConfig(
+            template_id="t1",
+            name="Template CME",
+            template_file_path="",
+            fields=[field1, field2],
+        )
+        proj = ProjectData(
+            project_id="p1",
+            site_name="SITE-001",
+            template_id="t1",
+            text_assignments={"fld_nama_site": "Pasar Minggu", "fld_spk": "SPK-9988"},
+        )
+
+        fn = format_output_filename(
+            "{template_name}_{Nama Site}_{Nomor SPK}_{date}",
+            project_data=proj,
+            template=tpl,
+        )
+        assert "Template_CME_Pasar_Minggu_SPK-9988_" in fn
+        assert fn.endswith(".xlsx")
+
+    def test_illegal_characters_and_whitespace_cleaning(self):
+        proj = ProjectData(project_id="p1", site_name='JKT/01:Telkom*Sel?"<>|', template_id="t1")
+        tpl = TemplateConfig(template_id="t1", name="Doc/CME", template_file_path="")
+
+        fn = format_output_filename(
+            "Doc_{site_name}",
+            project_data=proj,
+            template=tpl,
+        )
+        assert "/" not in fn
+        assert ":" not in fn
+        assert "*" not in fn
+        assert "?" not in fn
+        assert '"' not in fn
+        assert "<" not in fn
+        assert ">" not in fn
+        assert "|" not in fn
+        assert fn.endswith(".xlsx")
+
 
