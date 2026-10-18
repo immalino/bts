@@ -340,3 +340,38 @@ class TestStorageManager:
         assert len(projects) == 1
         assert projects[0].project_id == "valid_proj"
 
+    def test_template_file_copy_and_portable_resolution(self, storage: StorageManager, tmp_path: Path):
+        """Memastikan file master Excel otomatis disalin ke internal files/ dan bisa di-resolve saat dipindah."""
+        # 1. Buat file Excel dummy di folder eksternal (misal: Downloads)
+        external_excel = tmp_path / "Downloads" / "Template_Master.xlsx"
+        external_excel.parent.mkdir(parents=True, exist_ok=True)
+        external_excel.write_bytes(b"PK\x03\x04fake_excel_bytes")
+
+        tpl = TemplateConfig(
+            template_id="tpl_portable_01",
+            name="Template Portabel",
+            template_file_path=str(external_excel),
+        )
+
+        # 2. Simpan template -> file Excel harus disalin ke template_files_dir
+        saved_path = storage.save_template(tpl)
+        assert saved_path.is_file()
+
+        copied_excel = storage.template_files_dir / "tpl_portable_01.xlsx"
+        assert copied_excel.is_file()
+        assert copied_excel.read_bytes() == b"PK\x03\x04fake_excel_bytes"
+
+        # 3. Hapus file sumber asli di Downloads (simulasi file user terhapus/dipindah)
+        external_excel.unlink()
+        assert not external_excel.exists()
+
+        # 4. Muat ulang template -> harus tetap menemukan file Excel dari internal files/
+        loaded_tpl = storage.load_template("tpl_portable_01")
+        assert Path(loaded_tpl.template_file_path).is_file()
+        assert Path(loaded_tpl.template_file_path).name == "tpl_portable_01.xlsx"
+
+        # 5. Hapus template -> file JSON dan file Excel internal harus ikut terhapus
+        storage.delete_template("tpl_portable_01")
+        assert not saved_path.exists()
+        assert not copied_excel.exists()
+

@@ -6,9 +6,10 @@ import json
 import logging
 import os
 from pathlib import Path
+import shutil
 from typing import List, Optional, Union
 
-from src.config import BASE_DIR
+from src.config import BASE_DIR, DATA_DIR
 from src.core.models import ProjectData, TemplateConfig
 
 logger = logging.getLogger(__name__)
@@ -27,11 +28,12 @@ class StorageManager:
             base_dir: Direktori dasar penyimpanan. Jika None, default ke `<BASE_DIR>/data`.
         """
         if base_dir is None:
-            self.base_dir = BASE_DIR / "data"
+            self.base_dir = DATA_DIR
         else:
             self.base_dir = Path(base_dir)
 
         self.templates_dir = self.base_dir / "templates"
+        self.template_files_dir = self.templates_dir / "files"
         self.projects_dir = self.base_dir / "projects"
 
         self._ensure_directories()
@@ -39,6 +41,7 @@ class StorageManager:
     def _ensure_directories(self) -> None:
         """Pastikan direktori penyimpanan template dan project tersedia."""
         self.templates_dir.mkdir(parents=True, exist_ok=True)
+        self.template_files_dir.mkdir(parents=True, exist_ok=True)
         self.projects_dir.mkdir(parents=True, exist_ok=True)
 
     def _write_json_atomic(self, file_path: Path, data: dict) -> None:
@@ -66,6 +69,8 @@ class StorageManager:
     def save_template(self, template: TemplateConfig) -> Path:
         """
         Simpan atau perbarui TemplateConfig ke disk sebagai file JSON.
+        Jika berkas Excel template ada, salin berkas ke subfolder internal 'files/'
+        agar template bersifat mandiri dan portabel.
 
         Args:
             template: Objek konfigurasi template.
@@ -73,6 +78,18 @@ class StorageManager:
         Returns:
             Path file JSON yang tersimpan.
         """
+        # Salin file master Excel jika ada di disk dan belum ada di template_files_dir
+        if template.template_file_path and os.path.isfile(template.template_file_path):
+            try:
+                src_path = Path(template.template_file_path).resolve()
+                suffix = src_path.suffix or ".xlsx"
+                dest_path = (self.template_files_dir / f"{template.template_id}{suffix}").resolve()
+                if src_path != dest_path:
+                    shutil.copy2(src_path, dest_path)
+                    template.template_file_path = str(dest_path)
+            except Exception as e:
+                logger.warning("Gagal menyalin berkas template Excel ke internal storage: %s", e)
+
         target_file = self._template_file(template.template_id)
         self._write_json_atomic(target_file, template.to_dict())
         return target_file
@@ -100,7 +117,17 @@ class StorageManager:
                 data = json.load(f)
             if not isinstance(data, dict):
                 raise ValueError("Format JSON template tidak valid (harus object/dict).")
-            return TemplateConfig.from_dict(data)
+            tpl = TemplateConfig.from_dict(data)
+
+            # Jika file template Excel tidak ditemukan pada path yang tercatat (misal path absolut PC lama),
+            # cari file cadangan lokal di self.template_files_dir
+            if not os.path.isfile(tpl.template_file_path):
+                for match in self.template_files_dir.glob(f"{template_id}.*"):
+                    if match.is_file():
+                        tpl.template_file_path = str(match.resolve())
+                        break
+
+            return tpl
         except Exception as e:
             if isinstance(e, FileNotFoundError):
                 raise
@@ -129,7 +156,7 @@ class StorageManager:
 
     def delete_template(self, template_id: str) -> bool:
         """
-        Hapus file JSON template berdasarkan ID.
+        Hapus file JSON template dan file master Excel terkait berdasarkan ID.
 
         Args:
             template_id: ID template yang akan dihapus.
@@ -138,10 +165,20 @@ class StorageManager:
             True jika berhasil dihapus, False jika berkas tidak ditemukan.
         """
         target_file = self._template_file(template_id)
+        deleted = False
         if target_file.is_file():
             target_file.unlink()
-            return True
-        return False
+            deleted = True
+
+        # Hapus juga file master Excel jika ada di template_files_dir
+        for match in self.template_files_dir.glob(f"{template_id}.*"):
+            try:
+                match.unlink()
+                deleted = True
+            except OSError:
+                pass
+
+        return deleted
 
     # ==================== Project Operations ====================
 

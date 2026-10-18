@@ -9,13 +9,23 @@ from typing import Final, Tuple
 # Nama Aplikasi Resmi
 APP_NAME: Final[str] = "BTS Document Control"
 
-# Menentukan root direktori (kompatibel saat running script langsung maupun frozen PyInstaller)
+# Menentukan direktori aset (bundle PyInstaller) dan direktori aplikasi persisten
 if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-    BASE_DIR: Final[Path] = Path(sys._MEIPASS)
+    BUNDLE_DIR: Final[Path] = Path(sys._MEIPASS)
 else:
-    BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent
+    BUNDLE_DIR: Final[Path] = Path(__file__).resolve().parent.parent
 
-ASSETS_DIR: Final[Path] = BASE_DIR / "assets"
+if getattr(sys, "frozen", False):
+    # Mode Executable (.exe): Data disimpan portabel di sebelah file .exe
+    APP_DIR: Final[Path] = Path(sys.executable).resolve().parent
+else:
+    # Mode Source Code Python: Data disimpan di direktori root proyek
+    APP_DIR: Final[Path] = Path(__file__).resolve().parent.parent
+
+BASE_DIR: Final[Path] = APP_DIR
+DATA_DIR: Final[Path] = APP_DIR / "data"
+
+ASSETS_DIR: Final[Path] = BUNDLE_DIR / "assets"
 APP_ICON_PNG: Final[Path] = ASSETS_DIR / "icon.png"
 APP_ICON_ICO: Final[Path] = ASSETS_DIR / "icon.ico"
 
