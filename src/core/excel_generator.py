@@ -253,3 +253,4 @@ class ExcelGeneratorThread(QThread):
                 fail_count += 1
 
         self.generation_completed.emit(self.output_path, success_count, fail_count, errors)
+

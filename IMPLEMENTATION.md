@@ -829,7 +829,7 @@ Membangun antarmuka visual (Dialog) di PySide6 untuk mengelola template laporan:
 - `tests/test_template_dialog.py` (unit test visual dialog & form validation)
 
 #### 📋 Checklist Tugas Sesi 10
-- [ ] Buat `src/ui/template_dialog.py`:
+- [x] Buat `src/ui/template_dialog.py`:
   - `TemplateManagerDialog`: Menampilkan daftar template tersimpan, tombol "Buat Template Baru", "Edit", "Hapus", dan "Pilih Template Aktif".
   - `TemplateEditorDialog`: Form pengisian nama template, pemilihan file template `.xlsx`, auto-load daftar sheet ke ComboBox.
   - `FieldEditDialog`: Form detail field foto:
@@ -837,9 +837,9 @@ Membangun antarmuka visual (Dialog) di PySide6 untuk mengelola template laporan:
     - Dropdown Sheet Target (pilihan sheet dari file `.xlsx`)
     - Input Sel Anchor (contoh: "B5")
     - Checkbox / Radio Mode Ukuran: "Auto-Fit ke Ukuran Sel (Rekomendasi)" atau "Ukuran Kustom (Lebar x Tinggi)".
-- [ ] Hubungkan dengan `StorageManager` untuk menyimpan perubahan konfigurasi template.
-- [ ] Tulis unit test di `tests/test_template_dialog.py` untuk menguji validasi form (nama kosong, file tidak valid, koordinat sel tidak valid).
-- [ ] Jalankan `pytest tests/test_template_dialog.py` dan pastikan 100% PASSED.
+- [x] Hubungkan dengan `StorageManager` untuk menyimpan perubahan konfigurasi template.
+- [x] Tulis unit test di `tests/test_template_dialog.py` untuk menguji validasi form (nama kosong, file tidak valid, koordinat sel tidak valid).
+- [x] Jalankan `pytest tests/test_template_dialog.py` dan pastikan 100% PASSED.
 
 #### 🧪 Cara Verifikasi Sesi 10
 ```bash

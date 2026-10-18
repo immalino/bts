@@ -4,7 +4,8 @@ Fungsi pembantu untuk kalkulasi dimensi sel & merged cell di openpyxl
 serta kalkulasi resize proporsional gambar (auto-fit cell).
 """
 
-from typing import Tuple, Union
+from pathlib import Path
+from typing import List, Tuple, Union
 import openpyxl
 from openpyxl.utils import coordinate_to_tuple, get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
@@ -123,3 +124,56 @@ def calculate_fitted_dimensions(
     new_h = max(1, int(round(img_height * scale)))
 
     return (new_w, new_h)
+
+
+def is_valid_cell_coordinate(cell_coordinate: str) -> bool:
+    """
+    Validasi format koordinat sel Excel (misal: 'A1', 'B5', 'AA10').
+    Mengembalikan True jika format koordinat valid, False jika tidak.
+    """
+    if not isinstance(cell_coordinate, str):
+        return False
+    clean = cell_coordinate.strip().replace("$", "").upper()
+    if not clean:
+        return False
+    import re
+    if not re.match(r"^[A-Z]{1,3}[1-9][0-9]{0,6}$", clean):
+        return False
+    try:
+        row, col = coordinate_to_tuple(clean)
+        return 1 <= row <= 1048576 and 1 <= col <= 16384
+    except Exception:
+        return False
+
+
+def get_sheet_names_from_excel(file_path: Union[str, Path]) -> List[str]:
+    """
+    Membaca daftar nama sheet dari file workbook Excel (.xlsx, .xlsm, dll) secara cepat.
+
+    Args:
+        file_path: Path ke file Excel.
+
+    Returns:
+        List[str]: Daftar nama sheet di workbook.
+
+    Raises:
+        FileNotFoundError: Jika file tidak ditemukan.
+        ValueError: Jika format file bukan Excel atau korup.
+    """
+    path = Path(file_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"File Excel tidak ditemukan: {file_path}")
+    if path.suffix.lower() not in (".xlsx", ".xlsm", ".xltx", ".xltm"):
+        raise ValueError(f"File bukan format Excel spreadsheet yang didukung (.xlsx): {file_path}")
+
+    try:
+        wb = openpyxl.load_workbook(str(path), read_only=True)
+        try:
+            return list(wb.sheetnames)
+        finally:
+            wb.close()
+    except Exception as err:
+        if isinstance(err, (FileNotFoundError, ValueError)):
+            raise
+        raise ValueError(f"Gagal membaca sheet dari file Excel '{file_path}': {err}") from err
+

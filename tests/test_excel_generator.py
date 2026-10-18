@@ -488,3 +488,4 @@ class TestExcelGeneratorThread:
         _, success, fail, errors = completed[0]
         assert "dibatalkan" in errors[0]
         assert not os.path.exists(output_file)
+
