@@ -19,6 +19,7 @@ from src.utils.excel_utils import (
     calculate_fitted_dimensions,
     calculate_image_anchor,
     get_cell_dimensions,
+    preserve_merged_cell_borders,
     sanitize_excel_output,
 )
 
@@ -315,7 +316,24 @@ class ExcelGeneratorThread(QThread):
                 if out_dir:
                     os.makedirs(out_dir, exist_ok=True)
 
-                # Pastikan perhitungan formula dihitung otomatis saat dibuka di Excel
+                # 1. Pastikan garis kisi-kisi (gridlines / border visual) dan border sel tetap tampil
+                for ws_item in wb.worksheets:
+                    ws_item.sheet_view.showGridLines = True
+                    try:
+                        if ws_item.views and ws_item.views.sheetView:
+                            for sv in ws_item.views.sheetView:
+                                sv.showGridLines = True
+                    except Exception:
+                        pass
+                    try:
+                        ws_item.print_options.gridLines = True
+                        ws_item.print_options.gridLinesSet = True
+                    except Exception:
+                        pass
+                    # Pastikan border merged cells tidak hilang saat diserialisasi
+                    preserve_merged_cell_borders(ws_item)
+
+                # 2. Pastikan perhitungan formula dihitung otomatis saat dibuka di Excel
                 try:
                     if hasattr(wb, "calculation"):
                         wb.calculation.calcMode = "auto"

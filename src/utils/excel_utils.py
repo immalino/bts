@@ -355,11 +355,16 @@ def sanitize_excel_output(file_path: str) -> None:
                     )
                     content = text.encode("utf-8")
 
-                # Standarkan tag nilai formula kosong pada worksheet
+                # Standarkan tag nilai formula kosong pada worksheet dan pastikan gridlines aktif
                 elif item.filename.startswith("xl/worksheets/sheet") and item.filename.endswith(".xml"):
                     text = content.decode("utf-8")
                     text = re.sub(r'<v\s*/>', '<v>0</v>', text)
                     text = re.sub(r'<v>\s*</v>', '<v>0</v>', text)
+
+                    # Pastikan garis kisi-kisi (gridlines / border visual) selalu aktif dan tidak disembunyikan Excel saat ada gambar
+                    if 'showGridLines="0"' in text or "showGridLines='0'" in text:
+                        text = re.sub(r'showGridLines=[\"\']0[\"\']', 'showGridLines="1"', text)
+                    text = re.sub(r'<sheetView\b(?![^>]*\bshowGridLines=)', '<sheetView showGridLines="1"', text)
                     content = text.encode("utf-8")
 
                 zout.writestr(item, content)
@@ -372,6 +377,33 @@ def sanitize_excel_output(file_path: str) -> None:
                 os.remove(temp_path)
             except OSError:
                 pass
+
+
+def preserve_merged_cell_borders(worksheet: Worksheet) -> None:
+    """
+    Memastikan border perimeter pada merged cell ranges tetap utuh dan terdefinisi
+    pada seluruh sel tepi rentang (top, bottom, left, right) agar tidak hilang
+    saat diserialisasi oleh openpyxl.
+    """
+    from openpyxl.styles import Border, Side
+
+    for rng in list(worksheet.merged_cells.ranges):
+        min_col, min_row, max_col, max_row = rng.bounds
+        top_left = worksheet.cell(min_row, min_col)
+        b = top_left.border
+        if not b or not any([b.left.style, b.right.style, b.top.style, b.bottom.style]):
+            continue
+
+        for r in range(min_row, max_row + 1):
+            for c in range(min_col, max_col + 1):
+                cell = worksheet.cell(r, c)
+                cb = cell.border
+                l_side = b.left if (c == min_col and b.left and b.left.style) else (cb.left if cb and cb.left else Side())
+                r_side = b.right if (c == max_col and b.right and b.right.style) else (cb.right if cb and cb.right else Side())
+                t_side = b.top if (r == min_row and b.top and b.top.style) else (cb.top if cb and cb.top else Side())
+                b_side = b.bottom if (r == max_row and b.bottom and b.bottom.style) else (cb.bottom if cb and cb.bottom else Side())
+                cell.border = Border(left=l_side, right=r_side, top=t_side, bottom=b_side)
+
 
 
 def format_output_filename(

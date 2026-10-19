@@ -24,8 +24,10 @@ from src.utils.excel_utils import (
     calculate_image_anchor,
     format_output_filename,
     get_cell_dimensions,
+    preserve_merged_cell_borders,
     sanitize_excel_output,
 )
+
 
 
 # =====================================================================
@@ -794,8 +796,47 @@ class TestExcelGeneratorThread:
         if hasattr(wb_res, "calculation"):
             assert wb_res.calculation.fullCalcOnLoad is True
             assert wb_res.calculation.calcMode == "auto"
+        # 4. Verifikasi showGridLines aktif pada sheet_view
+        assert ws_res.sheet_view.showGridLines is True
 
         wb_res.close()
+
+        # 5. Verifikasi XML raw hasil sanitasi memiliki showGridLines="1"
+        import zipfile
+        with zipfile.ZipFile(out_file, "r") as zcheck:
+            sheet_xml = zcheck.read("xl/worksheets/sheet1.xml").decode("utf-8")
+            assert 'showGridLines="1"' in sheet_xml
+
+    def test_preserve_merged_cell_borders(self):
+        """Memverifikasi bahwa preserve_merged_cell_borders mendistribusikan border ke perimeter rentang sel yang di-merge."""
+        from openpyxl.styles import Border, Side
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.merge_cells("B2:D4")
+
+        thin = Side(border_style="thin", color="000000")
+        thick = Side(border_style="thick", color="000000")
+        top_left = ws.cell(2, 2)
+        top_left.border = Border(left=thick, right=thick, top=thin, bottom=thin)
+
+        preserve_merged_cell_borders(ws)
+
+        # Sel B2 (kiri atas): left=thick, top=thin
+        assert ws.cell(2, 2).border.left.style == "thick"
+        assert ws.cell(2, 2).border.top.style == "thin"
+
+        # Sel D2 (kanan atas): right=thick, top=thin
+        assert ws.cell(2, 4).border.right.style == "thick"
+        assert ws.cell(2, 4).border.top.style == "thin"
+
+        # Sel B4 (kiri bawah): left=thick, bottom=thin
+        assert ws.cell(4, 2).border.left.style == "thick"
+        assert ws.cell(4, 2).border.bottom.style == "thin"
+
+        # Sel D4 (kanan bawah): right=thick, bottom=thin
+        assert ws.cell(4, 4).border.right.style == "thick"
+        assert ws.cell(4, 4).border.bottom.style == "thin"
 
 
 class TestFormatOutputFilename:
