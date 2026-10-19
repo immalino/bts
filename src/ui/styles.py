@@ -214,6 +214,7 @@ QScrollBar::sub-page:horizontal {{
    ========================================================================== */
 QFrame#HeaderCard,
 QFrame#ToolbarCard,
+QFrame#TopBarCard,
 QFrame#FooterCard,
 QFrame#CardPanel {{
     background-color: {p.SURFACE};

@@ -5,23 +5,28 @@ Menampilkan: Nomor urut, Nama Field Foto, Badge Info Sheet & Sel, Thumbnail,
 DropZone interaktif, Tombol Pilih/Hapus Foto, dan Status (Kosong / Terisi).
 """
 
+import datetime
 import os
+import uuid
 from typing import Optional
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtGui import QIcon, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
+    QApplication,
     QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
     QPushButton,
     QStyle,
+    QToolTip,
     QVBoxLayout,
 )
 
-from src.config import SUPPORTED_EXTENSIONS, THUMBNAIL_SIZE, ThemeColors
+from src.config import CLIPBOARD_DIR, SUPPORTED_EXTENSIONS, THUMBNAIL_SIZE, ThemeColors
 from src.core.image_loader import create_thumbnail
 from src.core.models import PhotoFieldConfig
 from src.ui.drop_zone import DropZoneWidget
@@ -140,13 +145,16 @@ class DynamicPhotoRow(QFrame):
         info_layout.addWidget(self.lbl_badge)
         main_layout.addWidget(info_container, stretch=1)
 
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
         # 4. DropZone (Drag & Drop + Klik Pilih)
         self.drop_zone = DropZoneWidget(self)
-        self.drop_zone.setFixedWidth(240)
+        self.drop_zone.setFixedWidth(210)
         self.drop_zone.setCursor(Qt.CursorShape.PointingHandCursor)
         main_layout.addWidget(self.drop_zone)
 
-        # 5. Tombol Aksi (Pilih Foto & Hapus Foto)
+        # 5. Tombol Aksi (Pilih, Tempel, Hapus Foto)
+        p = ThemeManager.instance().get_palette()
         btn_container = QFrame(self)
         btn_layout = QHBoxLayout(btn_container)
         btn_layout.setContentsMargins(0, 0, 0, 0)
@@ -155,13 +163,14 @@ class DynamicPhotoRow(QFrame):
         self.btn_select = QPushButton("Pilih", self)
         self.btn_select.setIcon(get_icon("folder", color="#FFFFFF", size=14))
         self.btn_select.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_select.setToolTip("Pilih berkas foto dari penyimpanan komputer")
         self.btn_select.setStyleSheet(f"""
             QPushButton {{
                 background-color: {ThemeColors.PRIMARY};
                 color: #FFFFFF;
                 border: none;
                 border-radius: 5px;
-                padding: 6px 12px;
+                padding: 6px 11px;
                 font-size: 11px;
                 font-weight: 600;
             }}
@@ -171,14 +180,36 @@ class DynamicPhotoRow(QFrame):
         """)
         btn_layout.addWidget(self.btn_select)
 
+        self.btn_paste = QPushButton("Tempel", self)
+        self.btn_paste.setIcon(get_icon("clipboard", size=14))
+        self.btn_paste.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_paste.setToolTip("Tempel gambar dari clipboard (Ctrl+V) atau hasil Copy Image dari browser")
+        self.btn_paste.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {p.SURFACE_ALT};
+                color: {p.TEXT};
+                border: 1px solid {p.BORDER};
+                border-radius: 5px;
+                padding: 6px 10px;
+                font-size: 11px;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: {p.BORDER_LIGHT};
+                border-color: {p.BORDER_FOCUS};
+            }}
+        """)
+        btn_layout.addWidget(self.btn_paste)
+
         self.btn_clear = QPushButton("Hapus", self)
         self.btn_clear.setIcon(get_icon("trash", size=14))
         self.btn_clear.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_clear.setToolTip("Hapus foto yang terpasang pada field ini")
         self.btn_clear.setStyleSheet(f"""
             QPushButton {{
-                background-color: #F1F5F9;
-                color: {ThemeColors.TEXT};
-                border: 1px solid {ThemeColors.BORDER};
+                background-color: {p.SURFACE_ALT};
+                color: {p.TEXT};
+                border: 1px solid {p.BORDER};
                 border-radius: 5px;
                 padding: 6px 10px;
                 font-size: 11px;
@@ -200,7 +231,6 @@ class DynamicPhotoRow(QFrame):
         self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(self.lbl_status)
 
-        p = ThemeManager.instance().get_palette()
         self.setStyleSheet(f"""
             QFrame#DynamicPhotoRow {{
                 background-color: {p.SURFACE};
@@ -211,6 +241,7 @@ class DynamicPhotoRow(QFrame):
     def _setup_connections(self) -> None:
         self.drop_zone.file_dropped.connect(self.set_photo)
         self.btn_select.clicked.connect(self._on_choose_photo_clicked)
+        self.btn_paste.clicked.connect(self.paste_from_clipboard)
         self.btn_clear.clicked.connect(self.clear_photo)
 
         # Klik pada thumbnail membuka Lightbox Modal
@@ -218,13 +249,7 @@ class DynamicPhotoRow(QFrame):
 
         def on_thumb_click(event):
             if event.button() == Qt.MouseButton.LeftButton and self.photo_path and os.path.isfile(self.photo_path):
-                dlg = PhotoLightboxDialog(
-                    photo_path=self.photo_path,
-                    title=self.field_config.label,
-                    subtitle=f"Sheet: {self.field_config.sheet_name}  |  Sel: {self.field_config.cell_anchor}",
-                    parent=self,
-                )
-                dlg.exec()
+                self._open_lightbox()
             else:
                 orig_thumb_press(event)
 
@@ -240,6 +265,111 @@ class DynamicPhotoRow(QFrame):
                 orig_mouse_press(event)
 
         self.drop_zone.mousePressEvent = on_dropzone_click
+
+    def _open_lightbox(self) -> None:
+        """Membuka dialog Lightbox untuk melihat foto resolusi penuh."""
+        if self.photo_path and os.path.isfile(self.photo_path):
+            dlg = PhotoLightboxDialog(
+                photo_path=self.photo_path,
+                title=self.field_config.label,
+                subtitle=f"Sheet: {self.field_config.sheet_name}  |  Sel: {self.field_config.cell_anchor}",
+                parent=self,
+            )
+            dlg.exec()
+
+    def keyPressEvent(self, event) -> None:
+        """Mendukung shortcut keyboard Ctrl+V untuk menempel gambar dari clipboard."""
+        if event.matches(QKeySequence.StandardKey.Paste) or (
+            event.modifiers() & Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_V
+        ):
+            self.paste_from_clipboard()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
+
+    def contextMenuEvent(self, event) -> None:
+        """Konteks menu klik kanan baris untuk akses cepat Tempel, Pilih, dan Hapus."""
+        menu = QMenu(self)
+        act_paste = menu.addAction(get_icon("clipboard", size=14), "Tempel Gambar (Ctrl+V)")
+        act_select = menu.addAction(get_icon("folder", size=14), "Pilih Berkas...")
+        menu.addSeparator()
+        act_clear = menu.addAction(get_icon("trash", size=14), "Hapus Foto")
+        if not self.photo_path:
+            act_clear.setEnabled(False)
+
+        act_view = None
+        if self.photo_path and os.path.isfile(self.photo_path):
+            act_view = menu.addAction(get_icon("eye", size=14), "Lihat Ukuran Penuh (Lightbox)")
+
+        action = menu.exec(event.globalPos())
+        if action == act_paste:
+            self.paste_from_clipboard()
+        elif action == act_select:
+            self._on_choose_photo_clicked()
+        elif action == act_clear:
+            self.clear_photo()
+        elif act_view and action == act_view:
+            self._open_lightbox()
+
+    def paste_from_clipboard(self) -> bool:
+        """
+        Menerima dan memproses gambar dari clipboard sistem (OS Clipboard).
+        Mendukung:
+        1. Bitmap langsung dari browser ('Copy Image') atau screenshot (QImage).
+        2. File gambar lokal yang disalin dari File Explorer (file URLs).
+        
+        Returns:
+            bool: True jika gambar berhasil ditempel, False sebaliknya.
+        """
+        clipboard = QApplication.clipboard()
+        if not clipboard:
+            return False
+
+        mime_data = clipboard.mimeData()
+        if not mime_data:
+            self._show_paste_feedback("Clipboard kosong.")
+            return False
+
+        # 1. Cek apakah ada file URL lokal gambar yang disalin (misal dari File Explorer)
+        if mime_data.hasUrls():
+            for url in mime_data.urls():
+                if url.isLocalFile():
+                    local_path = url.toLocalFile()
+                    ext = os.path.splitext(local_path)[1].lower()
+                    if ext in SUPPORTED_EXTENSIONS and os.path.isfile(local_path):
+                        self.set_photo(local_path)
+                        return True
+
+        # 2. Cek apakah ada gambar bitmap (hasil 'Copy Image' di browser, snipping tool, screenshot)
+        if mime_data.hasImage() or not clipboard.image().isNull():
+            img = clipboard.image()
+            if not img.isNull():
+                CLIPBOARD_DIR.mkdir(parents=True, exist_ok=True)
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                unique_suffix = uuid.uuid4().hex[:8]
+                safe_field_id = "".join(
+                    c if c.isalnum() or c in ("-", "_") else "_"
+                    for c in getattr(self.field_config, "field_id", "photo")
+                )
+                filename = f"paste_{safe_field_id}_{timestamp}_{unique_suffix}.png"
+                target_path = str(CLIPBOARD_DIR / filename)
+
+                if img.save(target_path, "PNG"):
+                    self.set_photo(target_path)
+                    return True
+                else:
+                    self._show_paste_feedback("Gagal menyimpan gambar dari clipboard.")
+                    return False
+
+        # 3. Jika tidak ada gambar sama sekali di clipboard
+        self._show_paste_feedback("Tidak ada gambar di clipboard!\nSalin gambar terlebih dahulu (Copy Image / Screenshot).")
+        return False
+
+    def _show_paste_feedback(self, message: str) -> None:
+        """Menampilkan tooltip umpan balik sementara jika paste gagal atau tidak ada gambar."""
+        target_widget = getattr(self, "btn_paste", self)
+        pos = target_widget.mapToGlobal(QPoint(0, target_widget.height() + 4))
+        QToolTip.showText(pos, message, target_widget, target_widget.rect(), 3500)
 
     def set_row_index(self, index: int) -> None:
         """Memperbarui nomor urut baris foto."""
@@ -330,6 +460,46 @@ class DynamicPhotoRow(QFrame):
             """)
             self.lbl_thumbnail.setToolTip("")
             self.lbl_thumbnail.setCursor(Qt.CursorShape.ArrowCursor)
+
+        if hasattr(self, "btn_paste"):
+            self.btn_paste.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {p.SURFACE_ALT};
+                    color: {p.TEXT};
+                    border: 1px solid {p.BORDER};
+                    border-radius: 5px;
+                    padding: 6px 10px;
+                    font-size: 11px;
+                    font-weight: 500;
+                }}
+                QPushButton:hover {{
+                    background-color: {p.BORDER_LIGHT};
+                    border-color: {p.BORDER_FOCUS};
+                }}
+            """)
+        if hasattr(self, "btn_clear"):
+            self.btn_clear.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {p.SURFACE_ALT};
+                    color: {p.TEXT};
+                    border: 1px solid {p.BORDER};
+                    border-radius: 5px;
+                    padding: 6px 10px;
+                    font-size: 11px;
+                    font-weight: 500;
+                }}
+                QPushButton:hover {{
+                    background-color: #FEE2E2;
+                    border-color: #FCA5A5;
+                    color: {ThemeColors.ERROR};
+                }}
+            """)
+        self.setStyleSheet(f"""
+            QFrame#DynamicPhotoRow {{
+                background-color: {p.SURFACE};
+                border-bottom: 1px solid {p.BORDER};
+            }}
+        """)
 
     def matches_filter(self, search_text: str = "", status_filter: str = "all") -> bool:
         """

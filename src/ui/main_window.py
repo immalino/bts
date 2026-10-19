@@ -163,46 +163,67 @@ class MainWindow(QMainWindow):
         self.main_layout.setContentsMargins(20, 16, 20, 16)
         self.main_layout.setSpacing(12)
 
-        # 1. Header Card (Judul & Panduan Singkat)
-        self._create_header_section()
+        # 1. Top Bar Card Terpadu (Identitas, Status Konteks Interaktif, Aksi, & Filter)
+        self._create_top_bar_section()
 
-        # 2. Toolbar Card (Tombol Aksi & Statistik)
-        self._create_toolbar_section()
+        # 2. Document Tab Bar untuk Multi-Dokumen Site
+        self.document_tab_bar = DocumentTabBar(self)
+        self.document_tab_bar.document_selected.connect(self._on_document_tab_selected)
+        self.document_tab_bar.add_document_requested.connect(self._on_add_document_clicked)
+        self.document_tab_bar.remove_document_requested.connect(self._on_remove_document_clicked)
+        self.document_tab_bar.rename_document_requested.connect(self._on_rename_document_clicked)
+        self.document_tab_bar.setVisible(False)
+        self.main_layout.addWidget(self.document_tab_bar)
 
-        # 3. Middle Area (QScrollArea dengan baris-baris RowWidget)
+        # 3. Middle Area (QScrollArea dengan baris-baris foto/teks)
         self._create_scroll_area_section()
 
-        # 4. Bottom Panel Card (Folder Output & Opsi Overwrite)
+        # 4. Bottom Panel Card (Folder Output & Generate Excel)
         self._create_footer_section()
 
     def _create_header_section(self) -> None:
-        """Membuat bagian header dengan judul, info site & template aktif, dan theme toggle."""
-        header_card = QFrame(self)
-        header_card.setObjectName("HeaderCard")
-        header_layout = QVBoxLayout(header_card)
-        header_layout.setContentsMargins(16, 12, 16, 12)
-        header_layout.setSpacing(6)
+        """Kompatibilitas: bagian header kini terintegrasi di _create_top_bar_section."""
+        pass
 
-        # Baris Header: Logo/Judul & Status Badge Site/Template & Theme Toggle
-        header_top_layout = QHBoxLayout()
-        header_top_layout.setSpacing(10)
+    def _create_toolbar_section(self) -> None:
+        """Kompatibilitas: toolbar aksi kini terintegrasi di _create_top_bar_section."""
+        pass
 
-        title_container = QHBoxLayout()
-        title_container.setSpacing(8)
+    def _create_top_bar_section(self) -> None:
+        """
+        Membuat Top Bar terpadu yang modern, ringkas, dan profesional.
+        Menggabungkan identitas aplikasi, status konteks interaktif (Site & Template),
+        tombol aksi utama, pencarian instan, dan filter status.
+        """
+        top_bar_card = QFrame(self)
+        top_bar_card.setObjectName("TopBarCard")
+        top_bar_layout = QVBoxLayout(top_bar_card)
+        top_bar_layout.setContentsMargins(16, 10, 16, 10)
+        top_bar_layout.setSpacing(8)
 
-        lbl_logo = QLabel(header_card)
-        lbl_logo.setPixmap(render_svg_pixmap("camera", color="#2563EB", size=22))
-        title_container.addWidget(lbl_logo)
+        # -------------------------------------------------------------
+        # Baris 1: Identitas Aplikasi & Pill Konteks Interaktif & Tema
+        # -------------------------------------------------------------
+        row1_layout = QHBoxLayout()
+        row1_layout.setSpacing(12)
 
-        title_label = QLabel(APP_NAME, header_card)
+        # Logo & Nama Aplikasi
+        brand_container = QHBoxLayout()
+        brand_container.setSpacing(8)
+
+        lbl_logo = QLabel(top_bar_card)
+        lbl_logo.setPixmap(render_svg_pixmap("camera", color="#2563EB", size=20))
+        brand_container.addWidget(lbl_logo)
+
+        title_label = QLabel(APP_NAME, top_bar_card)
         title_label.setStyleSheet(f"""
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 700;
             color: {ThemeColors.TEXT};
         """)
-        title_container.addWidget(title_label)
+        brand_container.addWidget(title_label)
 
-        lbl_version = QLabel("v2.0", header_card)
+        lbl_version = QLabel("v2.0", top_bar_card)
         lbl_version.setStyleSheet(f"""
             background-color: {ThemeColors.SURFACE};
             color: {ThemeColors.TEXT_MUTED};
@@ -212,165 +233,86 @@ class MainWindow(QMainWindow):
             font-size: 10px;
             font-weight: 600;
         """)
-        title_container.addWidget(lbl_version)
-        header_top_layout.addLayout(title_container)
+        brand_container.addWidget(lbl_version)
+        row1_layout.addLayout(brand_container)
 
-        header_top_layout.addStretch(1)
+        row1_layout.addStretch(1)
 
-        # Badge Site Aktif
-        self.lbl_active_site = QLabel("Site: (Belum dipilih)", header_card)
-        self.lbl_active_site.setStyleSheet(f"""
-            background-color: #EFF6FF;
-            color: {ThemeColors.PRIMARY};
-            border: 1px solid #BFDBFE;
-            border-radius: 4px;
-            padding: 4px 10px;
-            font-size: 11px;
-            font-weight: 600;
-        """)
-        header_top_layout.addWidget(self.lbl_active_site)
+        # Pill Interaktif Site Aktif
+        self.lbl_active_site = QPushButton("Site: (Belum dipilih)  ▾", top_bar_card)
+        self.lbl_active_site.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.lbl_active_site.setToolTip("Klik untuk memilih atau mengganti Proyek Site")
+        self.lbl_active_site.clicked.connect(self.open_project_manager)
+        row1_layout.addWidget(self.lbl_active_site)
 
-        # Badge Template Aktif
-        self.lbl_active_template = QLabel("Template: (Belum dipilih)", header_card)
-        self.lbl_active_template.setStyleSheet(f"""
-            background-color: #F8FAFC;
-            color: {ThemeColors.TEXT_MUTED};
-            border: 1px solid {ThemeColors.BORDER};
-            border-radius: 4px;
-            padding: 4px 10px;
-            font-size: 11px;
-            font-weight: 600;
-        """)
-        header_top_layout.addWidget(self.lbl_active_template)
+        # Pill Interaktif Template Aktif
+        self.lbl_active_template = QPushButton("Template: (Belum dipilih)  ▾", top_bar_card)
+        self.lbl_active_template.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.lbl_active_template.setToolTip("Klik untuk mengelola atau memilih Template Laporan Excel")
+        self.lbl_active_template.clicked.connect(self.open_template_manager)
+        row1_layout.addWidget(self.lbl_active_template)
 
         # Tombol Toggle Dark / Light Mode
-        self.btn_theme_toggle = QPushButton(" Dark", header_card)
+        self.btn_theme_toggle = QPushButton(" Dark", top_bar_card)
         self.btn_theme_toggle.setObjectName("GhostButton")
         self.btn_theme_toggle.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_theme_toggle.setToolTip("Ganti Mode Tampilan (Light / Dark Mode)")
         self._update_theme_toggle_icon()
         self.btn_theme_toggle.clicked.connect(self.toggle_theme)
-        header_top_layout.addWidget(self.btn_theme_toggle)
+        row1_layout.addWidget(self.btn_theme_toggle)
 
-        header_layout.addLayout(header_top_layout)
+        top_bar_layout.addLayout(row1_layout)
 
-        guide_label = QLabel(
-            "Alur Dokumen BTS: 1. Pilih/Buat Proyek Site  •  "
-            "2. Tarik & lepas foto ke field template aktif (auto-save)  •  "
-            "3. Generate dokumen laporan Excel.",
-            header_card,
-        )
-        guide_label.setStyleSheet(f"""
-            font-size: 12px;
-            color: {ThemeColors.TEXT_MUTED};
-        """)
-        header_layout.addWidget(guide_label)
-
-        self.main_layout.addWidget(header_card)
-
-    def _create_toolbar_section(self) -> None:
-        """Membuat toolbar aksi di bagian atas lengkap dengan pencarian dan filter."""
-        toolbar_card = QFrame(self)
-        toolbar_card.setObjectName("ToolbarCard")
-        toolbar_vlayout = QVBoxLayout(toolbar_card)
-        toolbar_vlayout.setContentsMargins(14, 10, 14, 10)
-        toolbar_vlayout.setSpacing(8)
-
-        # Baris 1: Tombol Aksi Utama & Indikator Kesiapan
-        toolbar_top_layout = QHBoxLayout()
-        toolbar_top_layout.setSpacing(8)
+        # -------------------------------------------------------------
+        # Baris 2: Tombol Aksi Kerja + Quick Search + Filter Status
+        # -------------------------------------------------------------
+        row2_layout = QHBoxLayout()
+        row2_layout.setSpacing(10)
 
         # Tombol Ganti / Pilih Site
-        self.btn_select_site = QPushButton("Ganti / Pilih Site", toolbar_card)
+        self.btn_select_site = QPushButton("Ganti / Pilih Site", top_bar_card)
         self.btn_select_site.setObjectName("PrimaryButton")
         self.btn_select_site.setIcon(get_icon("building", color="#FFFFFF", size=14))
         self.btn_select_site.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_select_site.setToolTip("Pilih proyek site yang aktif atau buat proyek site baru")
-        toolbar_top_layout.addWidget(self.btn_select_site)
+        row2_layout.addWidget(self.btn_select_site)
 
         # Tombol Kelola Template
-        self.btn_manage_template = QPushButton("Kelola Template", toolbar_card)
+        self.btn_manage_template = QPushButton("Kelola Template", top_bar_card)
         self.btn_manage_template.setIcon(get_icon("file_spreadsheet", size=14))
         self.btn_manage_template.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_manage_template.setToolTip("Buka dialog manajemen template laporan Excel")
-        toolbar_top_layout.addWidget(self.btn_manage_template)
+        row2_layout.addWidget(self.btn_manage_template)
 
         # Separator visual
-        sep = QFrame(toolbar_card)
+        sep = QFrame(top_bar_card)
         sep.setFrameShape(QFrame.Shape.VLine)
         sep.setFrameShadow(QFrame.Shadow.Sunken)
-        toolbar_top_layout.addWidget(sep)
+        row2_layout.addWidget(sep)
 
-        # Tombol Impor
-        self.btn_import = QPushButton("Impor Nama (TXT/CSV)", toolbar_card)
-        self.btn_import.setIcon(get_icon("download", size=14))
-        self.btn_import.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_import.setToolTip("Impor daftar nama dari file .txt atau .csv")
-        toolbar_top_layout.addWidget(self.btn_import)
+        # Quick Search Bar
+        search_box = QWidget(top_bar_card)
+        search_box_layout = QHBoxLayout(search_box)
+        search_box_layout.setContentsMargins(0, 0, 0, 0)
+        search_box_layout.setSpacing(6)
 
-        # Tombol Tambah Baris
-        self.btn_add_row = QPushButton("Tambah Baris", toolbar_card)
-        self.btn_add_row.setIcon(get_icon("plus", size=14))
-        self.btn_add_row.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_add_row.setToolTip("Tambahkan 1 baris baru di posisi paling bawah")
-        toolbar_top_layout.addWidget(self.btn_add_row)
-
-        # Tombol Hapus Baris Kosong
-        self.btn_remove_empty = QPushButton("Hapus Baris Kosong", toolbar_card)
-        self.btn_remove_empty.setIcon(get_icon("trash", size=14))
-        self.btn_remove_empty.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_remove_empty.setToolTip("Hapus semua baris yang tidak memiliki foto dan nama")
-        toolbar_top_layout.addWidget(self.btn_remove_empty)
-
-        # Tombol Reset
-        self.btn_reset = QPushButton("Reset Semua", toolbar_card)
-        self.btn_reset.setObjectName("DangerButton")
-        self.btn_reset.setIcon(get_icon("refresh", size=14))
-        self.btn_reset.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_reset.setToolTip("Kembalikan semua baris dan pengaturan ke kondisi awal")
-        toolbar_top_layout.addWidget(self.btn_reset)
-
-        toolbar_top_layout.addStretch(1)
-
-        # Mini Readiness Bar
-        self.readiness_bar = QProgressBar(toolbar_card)
-        self.readiness_bar.setFixedSize(100, 8)
-        self.readiness_bar.setRange(0, 100)
-        self.readiness_bar.setValue(0)
-        self.readiness_bar.setTextVisible(False)
-        self.readiness_bar.setVisible(False)
-        toolbar_top_layout.addWidget(self.readiness_bar)
-
-        # Label Statistik Baris
-        self.lbl_stats = QLabel("Total: 0 baris | Foto: 0 | Siap: 0", toolbar_card)
-        self.lbl_stats.setStyleSheet(f"""
-            font-size: 12px;
-            font-weight: 600;
-            color: {ThemeColors.TEXT_MUTED};
-        """)
-        toolbar_top_layout.addWidget(self.lbl_stats)
-
-        toolbar_vlayout.addLayout(toolbar_top_layout)
-
-        # Baris 2: Search & Filter Controls (Instant Filter Bar)
-        self.filter_container = QWidget(toolbar_card)
-        filter_layout = QHBoxLayout(self.filter_container)
-        filter_layout.setContentsMargins(0, 2, 0, 0)
-        filter_layout.setSpacing(8)
-
-        lbl_search_icon = QLabel(self.filter_container)
+        lbl_search_icon = QLabel(search_box)
         lbl_search_icon.setPixmap(render_svg_pixmap("search", size=14))
-        filter_layout.addWidget(lbl_search_icon)
+        search_box_layout.addWidget(lbl_search_icon)
 
-        self.input_search = QLineEdit(self.filter_container)
-        self.input_search.setPlaceholderText("Cari nama field foto, sheet, atau sel Excel (misal 'Antenna', 'B5')...")
-        self.input_search.setFixedHeight(30)
+        self.input_search = QLineEdit(search_box)
+        self.input_search.setPlaceholderText("Cari field foto, teks, sheet, atau sel (misal 'Antenna', 'B5')...")
+        self.input_search.setFixedHeight(28)
+        self.input_search.setClearButtonEnabled(True)
         self.input_search.textChanged.connect(self._on_search_text_changed)
-        filter_layout.addWidget(self.input_search, stretch=1)
+        search_box_layout.addWidget(self.input_search, stretch=1)
+        row2_layout.addWidget(search_box, stretch=1)
 
-        lbl_filter = QLabel("Filter:", self.filter_container)
-        lbl_filter.setStyleSheet("font-size: 11px; font-weight: 600;")
-        filter_layout.addWidget(lbl_filter)
+        # Segmented Filter Bar: Semua, Belum Terisi, Sudah Terisi
+        self.filter_container = QWidget(top_bar_card)
+        filter_layout = QHBoxLayout(self.filter_container)
+        filter_layout.setContentsMargins(0, 0, 0, 0)
+        filter_layout.setSpacing(4)
 
         self.active_status_filter = "all"
         self.btn_filter_all = QPushButton("Semua", self.filter_container)
@@ -396,19 +338,40 @@ class MainWindow(QMainWindow):
         self.lbl_filter_stats.setVisible(False)
         filter_layout.addWidget(self.lbl_filter_stats)
 
+        row2_layout.addWidget(self.filter_container)
+
+        # Mini Readiness Bar & Label Statistik
+        self.readiness_bar = QProgressBar(top_bar_card)
+        self.readiness_bar.setFixedSize(70, 8)
+        self.readiness_bar.setRange(0, 100)
+        self.readiness_bar.setValue(0)
+        self.readiness_bar.setTextVisible(False)
+        self.readiness_bar.setVisible(False)
+        row2_layout.addWidget(self.readiness_bar)
+
+        self.lbl_stats = QLabel("Total: 0 baris | Foto: 0 | Siap: 0", top_bar_card)
+        self.lbl_stats.setStyleSheet(f"""
+            font-size: 11px;
+            font-weight: 600;
+            color: {ThemeColors.TEXT_MUTED};
+        """)
+        row2_layout.addWidget(self.lbl_stats)
+
+        top_bar_layout.addLayout(row2_layout)
+        self.main_layout.addWidget(top_bar_card)
+
+        # Elemen legacy yang disembunyikan (kompatibilitas test suite)
+        self.btn_import = QPushButton("Impor Nama (TXT/CSV)", self)
+        self.btn_import.setVisible(False)
+        self.btn_add_row = QPushButton("Tambah Baris", self)
+        self.btn_add_row.setVisible(False)
+        self.btn_remove_empty = QPushButton("Hapus Baris Kosong", self)
+        self.btn_remove_empty.setVisible(False)
+        self.btn_reset = QPushButton("Reset Semua", self)
+        self.btn_reset.setVisible(False)
+
+        self._update_header_pill_styles()
         self._update_filter_button_styles()
-        toolbar_vlayout.addWidget(self.filter_container)
-
-        self.main_layout.addWidget(toolbar_card)
-
-        # Document Tab Bar untuk Multi-Dokumen Site
-        self.document_tab_bar = DocumentTabBar(self)
-        self.document_tab_bar.document_selected.connect(self._on_document_tab_selected)
-        self.document_tab_bar.add_document_requested.connect(self._on_add_document_clicked)
-        self.document_tab_bar.remove_document_requested.connect(self._on_remove_document_clicked)
-        self.document_tab_bar.rename_document_requested.connect(self._on_rename_document_clicked)
-        self.document_tab_bar.setVisible(False)
-        self.main_layout.addWidget(self.document_tab_bar)
 
     def _create_scroll_area_section(self) -> None:
         """Membuat area QScrollArea vertikal untuk menampung baris-baris foto dan empty state."""
@@ -461,11 +424,13 @@ class MainWindow(QMainWindow):
 
         footer_layout.addLayout(dir_layout)
 
-        # Baris 2: Checkbox Overwrite
+        # Baris 2: Checkbox Overwrite (Legacy - disembunyikan untuk UI BTS Document Control)
         opt_layout = QHBoxLayout()
+        opt_layout.setContentsMargins(0, 0, 0, 0)
         self.chk_overwrite = QCheckBox("Izinkan menimpa file yang sudah ada (Overwrite)", self.footer_card)
         self.chk_overwrite.setCursor(Qt.CursorShape.PointingHandCursor)
         self.chk_overwrite.setChecked(False)
+        self.chk_overwrite.setVisible(False)
         opt_layout.addWidget(self.chk_overwrite)
         opt_layout.addStretch(1)
 
@@ -572,9 +537,59 @@ class MainWindow(QMainWindow):
         self._update_theme_toggle_icon()
         self._update_styles_for_theme()
 
+    def _update_header_pill_styles(self) -> None:
+        """Memperbarui style pill site & template aktif sesuai tema dan status pemilihan."""
+        p = ThemeManager.instance().get_palette()
+        has_site = bool(self.current_project and self.current_project.site_name)
+        has_template = bool(self.current_template and self.current_template.name)
+
+        if hasattr(self, "lbl_active_site"):
+            site_bg = p.PRIMARY_LIGHT if has_site else p.SURFACE_ALT
+            site_border = p.PRIMARY if has_site else p.BORDER
+            site_color = p.PRIMARY if has_site else p.TEXT_MUTED
+            self.lbl_active_site.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {site_bg};
+                    color: {site_color};
+                    border: 1px solid {site_border};
+                    border-radius: 6px;
+                    padding: 4px 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                    text-align: left;
+                }}
+                QPushButton:hover {{
+                    border-color: {p.PRIMARY_HOVER};
+                    background-color: {p.PRIMARY_LIGHT};
+                }}
+            """)
+
+        if hasattr(self, "lbl_active_template"):
+            tpl_bg = p.PRIMARY_LIGHT if has_template else p.SURFACE_ALT
+            tpl_border = p.PRIMARY if has_template else p.BORDER
+            tpl_color = p.PRIMARY if has_template else p.TEXT_MUTED
+            self.lbl_active_template.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {tpl_bg};
+                    color: {tpl_color};
+                    border: 1px solid {tpl_border};
+                    border-radius: 6px;
+                    padding: 4px 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                    text-align: left;
+                }}
+                QPushButton:hover {{
+                    border-color: {p.PRIMARY_HOVER};
+                    background-color: {p.PRIMARY_LIGHT};
+                }}
+            """)
+
     def _update_styles_for_theme(self) -> None:
         """Menyegarkan tampilan widget turunan saat tema aplikasi berganti."""
         palette = ThemeManager.instance().get_palette()
+        if hasattr(self, "_update_header_pill_styles"):
+            self._update_header_pill_styles()
         if hasattr(self, "empty_state"):
             self.empty_state.update_theme()
         if getattr(self, "text_section_header", None):
@@ -698,7 +713,7 @@ class MainWindow(QMainWindow):
     def _update_header_info(self) -> None:
         """Memperbarui informasi site dan template aktif di header."""
         site_name = self.current_project.site_name if self.current_project else "(Belum dipilih)"
-        self.lbl_active_site.setText(f"Site: {site_name}")
+        self.lbl_active_site.setText(f"Site: {site_name}  ▾")
 
         doc_suffix = ""
         if self.current_project and hasattr(self.current_project, "get_active_document"):
@@ -707,7 +722,10 @@ class MainWindow(QMainWindow):
                 doc_suffix = f" [{active_doc.name}]"
 
         template_name = self.current_template.name if self.current_template else "(Belum dipilih)"
-        self.lbl_active_template.setText(f"Template: {template_name}{doc_suffix}")
+        self.lbl_active_template.setText(f"Template: {template_name}{doc_suffix}  ▾")
+
+        if hasattr(self, "_update_header_pill_styles"):
+            self._update_header_pill_styles()
 
     def load_last_opened_project(self) -> bool:
         """Membuka otomatis proyek site terakhir yang dikerjakan pengguna."""

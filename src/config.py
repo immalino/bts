@@ -24,6 +24,7 @@ else:
 
 BASE_DIR: Final[Path] = APP_DIR
 DATA_DIR: Final[Path] = APP_DIR / "data"
+CLIPBOARD_DIR: Final[Path] = DATA_DIR / "clipboard"
 
 ASSETS_DIR: Final[Path] = BUNDLE_DIR / "assets"
 APP_ICON_PNG: Final[Path] = ASSETS_DIR / "icon.png"
