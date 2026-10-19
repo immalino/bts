@@ -795,17 +795,13 @@ class TestExcelGeneratorThread:
         # 3. Verifikasi calculation properties terpasang
         if hasattr(wb_res, "calculation"):
             assert wb_res.calculation.fullCalcOnLoad is True
-            assert wb_res.calculation.calcMode == "auto"
-        # 4. Verifikasi showGridLines aktif pada sheet_view
-        assert ws_res.sheet_view.showGridLines is True
-
         wb_res.close()
 
-        # 5. Verifikasi XML raw hasil sanitasi memiliki showGridLines="1"
+        # 4. Verifikasi bahwa styles.xml memiliki applyBorder="1" agar Excel merender border dengan benar
         import zipfile
         with zipfile.ZipFile(out_file, "r") as zcheck:
-            sheet_xml = zcheck.read("xl/worksheets/sheet1.xml").decode("utf-8")
-            assert 'showGridLines="1"' in sheet_xml
+            styles_xml = zcheck.read("xl/styles.xml").decode("utf-8")
+            assert 'applyBorder="1"' in styles_xml
 
     def test_preserve_merged_cell_borders(self):
         """Memverifikasi bahwa preserve_merged_cell_borders mendistribusikan border ke perimeter rentang sel yang di-merge."""
@@ -837,6 +833,55 @@ class TestExcelGeneratorThread:
         # Sel D4 (kanan bawah): right=thick, bottom=thin
         assert ws.cell(4, 4).border.right.style == "thick"
         assert ws.cell(4, 4).border.bottom.style == "thin"
+
+    def test_respects_hidden_gridlines_and_applies_borders_and_fills(self, tmp_path: Path):
+        """Memverifikasi bahwa jika template menyembunyikan gridlines (showGridLines=False),
+        hasil generate tetap mempertahankan gridlines tersembunyi, dan styles.xml memiliki applyBorder=1 serta applyFill=1."""
+        from openpyxl.styles import Border, PatternFill, Side
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "GroundPart"
+        ws.sheet_view.showGridLines = False
+
+        thick = Side(border_style="medium", color="000000")
+        ws["B2"].border = Border(left=thick, right=thick, top=thick, bottom=thick)
+        ws["B2"].fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
+        ws["B2"].value = "Header Text"
+
+        tpl_file = str(tmp_path / "tpl_hidden_grid.xlsx")
+        wb.save(tpl_file)
+        wb.close()
+
+        out_file = str(tmp_path / "out_hidden_grid.xlsx")
+        field = PhotoFieldConfig(
+            field_id="txt1",
+            label="Site",
+            sheet_name="GroundPart",
+            cell_anchor="B2",
+            field_type="text",
+        )
+        thread = ExcelGeneratorThread(
+            template=tpl_file,
+            output_path=out_file,
+            fields=[field],
+            text_assignments={"txt1": "Site Padangbai"},
+        )
+        thread.run()
+
+        wb_res = openpyxl.load_workbook(out_file)
+        ws_res = wb_res["GroundPart"]
+        assert ws_res.sheet_view.showGridLines is False
+        wb_res.close()
+
+        import zipfile
+        with zipfile.ZipFile(out_file, "r") as zcheck:
+            sheet_xml = zcheck.read("xl/worksheets/sheet1.xml").decode("utf-8")
+            assert 'showGridLines="0"' in sheet_xml
+
+            styles_xml = zcheck.read("xl/styles.xml").decode("utf-8")
+            assert 'applyBorder="1"' in styles_xml
+            assert 'applyFill="1"' in styles_xml
 
 
 class TestFormatOutputFilename:

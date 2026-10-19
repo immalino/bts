@@ -355,16 +355,38 @@ def sanitize_excel_output(file_path: str) -> None:
                     )
                     content = text.encode("utf-8")
 
-                # Standarkan tag nilai formula kosong pada worksheet dan pastikan gridlines aktif
+                # Pastikan atribut applyBorder, applyFill, applyFont, applyNumberFormat aktif pada cellXfs di styles.xml
+                # agar Microsoft Excel tidak mengabaikan border sel, warna latar belakang (fill), dan format font
+                elif item.filename == "xl/styles.xml":
+                    text = content.decode("utf-8")
+
+                    def patch_xf(m: re.Match) -> str:
+                        tag = m.group(0)
+                        b_m = re.search(r'\bborderId=[\"\'](\d+)[\"\']', tag)
+                        if b_m and int(b_m.group(1)) > 0 and 'applyBorder=' not in tag:
+                            tag = tag.replace('<xf ', '<xf applyBorder="1" ')
+                        f_m = re.search(r'\bfillId=[\"\'](\d+)[\"\']', tag)
+                        if f_m and int(f_m.group(1)) > 0 and int(f_m.group(1)) != 1 and 'applyFill=' not in tag:
+                            tag = tag.replace('<xf ', '<xf applyFill="1" ')
+                        font_m = re.search(r'\bfontId=[\"\'](\d+)[\"\']', tag)
+                        if font_m and int(font_m.group(1)) > 0 and 'applyFont=' not in tag:
+                            tag = tag.replace('<xf ', '<xf applyFont="1" ')
+                        num_m = re.search(r'\bnumFmtId=[\"\'](\d+)[\"\']', tag)
+                        if num_m and int(num_m.group(1)) > 0 and 'applyNumberFormat=' not in tag:
+                            tag = tag.replace('<xf ', '<xf applyNumberFormat="1" ')
+                        return tag
+
+                    def patch_cell_xfs(m: re.Match) -> str:
+                        return re.sub(r'<xf\b[^>]*>', patch_xf, m.group(0))
+
+                    text = re.sub(r'<cellXfs\b[^>]*>.*?</cellXfs>', patch_cell_xfs, text, flags=re.DOTALL)
+                    content = text.encode("utf-8")
+
+                # Standarkan tag nilai formula kosong pada worksheet
                 elif item.filename.startswith("xl/worksheets/sheet") and item.filename.endswith(".xml"):
                     text = content.decode("utf-8")
                     text = re.sub(r'<v\s*/>', '<v>0</v>', text)
                     text = re.sub(r'<v>\s*</v>', '<v>0</v>', text)
-
-                    # Pastikan garis kisi-kisi (gridlines / border visual) selalu aktif dan tidak disembunyikan Excel saat ada gambar
-                    if 'showGridLines="0"' in text or "showGridLines='0'" in text:
-                        text = re.sub(r'showGridLines=[\"\']0[\"\']', 'showGridLines="1"', text)
-                    text = re.sub(r'<sheetView\b(?![^>]*\bshowGridLines=)', '<sheetView showGridLines="1"', text)
                     content = text.encode("utf-8")
 
                 zout.writestr(item, content)
