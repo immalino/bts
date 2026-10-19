@@ -444,4 +444,62 @@ def test_e2e_template_output_filename_pattern_applied(
     window.close()
 
 
+def test_e2e_excel_generation_with_cell_range(
+    qapp, tmp_path, dummy_excel_template, dummy_photos, monkeypatch
+):
+    """Verifikasi bahwa field foto dengan rentang sel 'B1:D4' berhasil di-generate ke Excel tanpa merge cell."""
+    photo1, _ = dummy_photos
+    storage = StorageManager(base_dir=tmp_path / "storage_range")
+
+    fields = [
+        PhotoFieldConfig(
+            field_id="fld_range",
+            label="Foto Rentang B1:D4",
+            sheet_name="Antenna",
+            cell_anchor="B1:D4",
+            field_type="photo",
+        ),
+    ]
+    template = TemplateConfig(
+        template_id="tpl_range",
+        name="Template Rentang",
+        template_file_path=dummy_excel_template,
+        fields=fields,
+    )
+    storage.save_template(template)
+
+    project = ProjectData(
+        project_id="proj_range",
+        site_name="SITE-RANGE-01",
+        template_id="tpl_range",
+        output_dir=str(tmp_path / "out_range"),
+    )
+    storage.save_project(project)
+
+    window = MainWindow(storage=storage)
+    window.set_project(project)
+
+    row = window.dynamic_rows[0]
+    row.set_photo(photo1)
+
+    out_file = str(tmp_path / "out_range" / "Laporan_Range.xlsx")
+    os.makedirs(os.path.dirname(out_file), exist_ok=True)
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (out_file, ""))
+    monkeypatch.setattr(ReportDialog, "exec", lambda self: 0)
+
+    window.start_export()
+    assert window.excel_generator_thread is not None
+    window.excel_generator_thread.wait(5000)
+    QCoreApplication.processEvents()
+
+    assert os.path.isfile(out_file)
+    wb = openpyxl.load_workbook(out_file)
+    ws = wb["Antenna"]
+    # Pastikan gambar ada di sheet Antenna
+    assert len(ws._images) == 1
+    wb.close()
+    window.close()
+
+
+
 

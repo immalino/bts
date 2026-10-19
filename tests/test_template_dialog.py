@@ -58,7 +58,7 @@ def sample_xlsx(tmp_path: Path) -> str:
 
 def test_is_valid_cell_coordinate():
     """Memverifikasi fungsi validasi koordinat sel Excel."""
-    # Valid coordinates
+    # Valid coordinates (single cell & cell range)
     assert is_valid_cell_coordinate("A1") is True
     assert is_valid_cell_coordinate("B5") is True
     assert is_valid_cell_coordinate("z100") is True
@@ -66,6 +66,10 @@ def test_is_valid_cell_coordinate():
     assert is_valid_cell_coordinate("$B$5") is True
     assert is_valid_cell_coordinate("  C10  ") is True
     assert is_valid_cell_coordinate("XFD1048576") is True
+    assert is_valid_cell_coordinate("B1:D4") is True
+    assert is_valid_cell_coordinate("a1:c10") is True
+    assert is_valid_cell_coordinate("$B$1:$D$4") is True
+    assert is_valid_cell_coordinate(" B1 : D4 ") is True
 
     # Invalid coordinates
     assert is_valid_cell_coordinate("") is False
@@ -76,6 +80,9 @@ def test_is_valid_cell_coordinate():
     assert is_valid_cell_coordinate("A0") is False
     assert is_valid_cell_coordinate("ABCD1") is False  # Kolom lebih dari 3 huruf
     assert is_valid_cell_coordinate("A9999999") is False  # Melebihi batas baris Excel
+    assert is_valid_cell_coordinate("B1:D4:E5") is False
+    assert is_valid_cell_coordinate("B1:") is False
+    assert is_valid_cell_coordinate(":D4") is False
     assert is_valid_cell_coordinate(None) is False  # type: ignore
 
 

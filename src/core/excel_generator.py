@@ -184,12 +184,17 @@ class ExcelGeneratorThread(QThread):
                         continue
 
                     try:
-                        ws[field.cell_anchor].value = str(text_val)
+                        target_cell = (
+                            field.cell_anchor.split(":")[0].strip()
+                            if ":" in field.cell_anchor
+                            else field.cell_anchor
+                        )
+                        ws[target_cell].value = str(text_val)
                         success_count += 1
                         self.item_finished.emit(
                             field.field_id,
                             True,
-                            f"Teks berhasil ditulis ke {field.cell_anchor}",
+                            f"Teks berhasil ditulis ke {target_cell}",
                         )
                     except Exception as ex:
                         err_msg = f"Gagal menulis teks ke '{field.cell_anchor}': {ex}"

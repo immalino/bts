@@ -212,7 +212,7 @@ class FieldEditDialog(QDialog):
 
         self.edit_cell = QLineEdit(form_group)
         self.edit_cell.setFixedHeight(34)
-        self.edit_cell.setPlaceholderText("Contoh: B5")
+        self.edit_cell.setPlaceholderText("Contoh: B5 atau B1:D4")
         cell_col.addWidget(self.edit_cell)
         coord_layout.addLayout(cell_col, stretch=1)
 
@@ -434,7 +434,7 @@ class FieldEditDialog(QDialog):
                 self,
                 "Validasi Gagal",
                 f"Koordinat sel anchor tidak valid: '{cell_anchor}'.\n"
-                "Format yang benar contohnya: B5, C10, AA1.",
+                "Format yang benar contohnya: B5, C10, atau rentang B1:D4.",
             )
             self.edit_cell.setFocus()
             return
@@ -1626,7 +1626,7 @@ class TemplateEditorDialog(QDialog):
                 QMessageBox.warning(
                     self,
                     "Validasi Gagal",
-                    f"Baris {idx + 1} ('{fld.label}'): Koordinat sel anchor '{fld.cell_anchor}' tidak valid.",
+                    f"Baris {idx + 1} ('{fld.label}'): Koordinat sel anchor '{fld.cell_anchor}' tidak valid (contoh format: B5 atau rentang B1:D4).",
                 )
                 return False
 

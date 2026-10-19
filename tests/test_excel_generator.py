@@ -136,6 +136,19 @@ class TestExcelUtils:
         assert w_inner == 225
         assert h_inner == 54
 
+    def test_cell_range_without_merge(self):
+        """Memverifikasi kalkulasi dimensi untuk rentang sel seperti 'B1:D4' tanpa perlu di-merge."""
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        for col in ["B", "C", "D"]:
+            ws.column_dimensions[col].width = 10.0  # round(10.0 * 7 + 5) = 75 px
+        for r in range(1, 5):
+            ws.row_dimensions[r].height = 20.0  # round(20 * (96/72)) = 27 px
+
+        w_px, h_px = get_cell_dimensions(ws, "B1:D4")
+        assert w_px == 75 * 3  # 225 px
+        assert h_px == 27 * 4  # 108 px
+
     def test_coordinate_normalization_and_invalid(self):
         wb = openpyxl.Workbook()
         ws = wb.active

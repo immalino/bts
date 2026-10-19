@@ -48,12 +48,22 @@ def get_cell_dimensions(worksheet: Worksheet, cell_coordinate: str) -> Tuple[int
     if target_range is not None:
         min_col, min_row, max_col, max_row = target_range.bounds
     else:
-        try:
-            row, col = coordinate_to_tuple(clean_coord)
-        except Exception as err:
-            raise ValueError(f"Format koordinat sel tidak valid '{cell_coordinate}': {err}") from err
-        min_col, max_col = col, col
-        min_row, max_row = row, row
+        if ":" in clean_coord:
+            parts = clean_coord.split(":", 1)
+            try:
+                r1, c1_idx = coordinate_to_tuple(parts[0].strip())
+                r2, c2_idx = coordinate_to_tuple(parts[1].strip())
+            except Exception as err:
+                raise ValueError(f"Format koordinat sel tidak valid '{cell_coordinate}': {err}") from err
+            min_col, max_col = min(c1_idx, c2_idx), max(c1_idx, c2_idx)
+            min_row, max_row = min(r1, r2), max(r1, r2)
+        else:
+            try:
+                row, col = coordinate_to_tuple(clean_coord)
+            except Exception as err:
+                raise ValueError(f"Format koordinat sel tidak valid '{cell_coordinate}': {err}") from err
+            min_col, max_col = col, col
+            min_row, max_row = row, row
 
     # Hitung total lebar kolom dalam piksel
     total_width_px = 0
@@ -170,9 +180,9 @@ def calculate_image_anchor(
         min_col, min_row, max_col, max_row = target_range.bounds
     else:
         if ":" in clean_coord:
-            c1, c2 = clean_coord.split(":", 1)
-            r1, c1_idx = coordinate_to_tuple(c1)
-            r2, c2_idx = coordinate_to_tuple(c2)
+            parts = clean_coord.split(":", 1)
+            r1, c1_idx = coordinate_to_tuple(parts[0].strip())
+            r2, c2_idx = coordinate_to_tuple(parts[1].strip())
             min_col, max_col = min(c1_idx, c2_idx), max(c1_idx, c2_idx)
             min_row, max_row = min(r1, r2), max(r1, r2)
         else:
@@ -254,22 +264,32 @@ def calculate_image_anchor(
 
 def is_valid_cell_coordinate(cell_coordinate: str) -> bool:
     """
-    Validasi format koordinat sel Excel (misal: 'A1', 'B5', 'AA10').
-    Mengembalikan True jika format koordinat valid, False jika tidak.
+    Validasi format koordinat sel Excel (misal: 'A1', 'B5', 'AA10', atau rentang 'B1:D4').
+    Mengembalikan True jika format koordinat sel tunggal atau rentang valid, False jika tidak.
     """
     if not isinstance(cell_coordinate, str):
         return False
     clean = cell_coordinate.strip().replace("$", "").upper()
     if not clean:
         return False
-    import re
-    if not re.match(r"^[A-Z]{1,3}[1-9][0-9]{0,6}$", clean):
-        return False
-    try:
-        row, col = coordinate_to_tuple(clean)
-        return 1 <= row <= 1048576 and 1 <= col <= 16384
-    except Exception:
-        return False
+
+    def _is_single_valid(coord: str) -> bool:
+        c = coord.strip()
+        if not re.match(r"^[A-Z]{1,3}[1-9][0-9]{0,6}$", c):
+            return False
+        try:
+            row, col = coordinate_to_tuple(c)
+            return 1 <= row <= 1048576 and 1 <= col <= 16384
+        except Exception:
+            return False
+
+    if ":" in clean:
+        parts = clean.split(":")
+        if len(parts) != 2:
+            return False
+        return _is_single_valid(parts[0]) and _is_single_valid(parts[1])
+
+    return _is_single_valid(clean)
 
 
 def get_sheet_names_from_excel(file_path: Union[str, Path]) -> List[str]:
