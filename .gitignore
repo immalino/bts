@@ -52,5 +52,8 @@ htmlcov/
 Thumbs.db
 
 # Local Data & Output
-data/
+data/*
+!data/templates/
+data/templates/*
+!data/templates/template_fields_sample.json
 output/

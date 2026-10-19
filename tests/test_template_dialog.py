@@ -587,4 +587,173 @@ def test_dialog_dimensions_minimum_size(qapp, tmp_path: Path):
     dlg_field.close()
 
 
+def test_template_editor_move_top_and_bottom(qapp, sample_xlsx: str):
+    """Memverifikasi pemindahan urutan field ke paling atas dan paling bawah."""
+    editor = TemplateEditorDialog()
+    editor.set_template_file(sample_xlsx)
+
+    f1 = PhotoFieldConfig("f1", "Field 1", "Sheet1", "A1")
+    f2 = PhotoFieldConfig("f2", "Field 2", "Sheet1", "A2")
+    f3 = PhotoFieldConfig("f3", "Field 3", "Sheet1", "A3")
+    f4 = PhotoFieldConfig("f4", "Field 4", "Sheet1", "A4")
+    editor.fields = [f1, f2, f3, f4]
+    editor._refresh_fields_table()
+
+    # Pindahkan f3 (index 2) ke paling atas
+    editor.table_fields.selectRow(2)
+    editor._on_move_top_clicked()
+    assert [f.field_id for f in editor.fields] == ["f3", "f1", "f2", "f4"]
+    assert editor.table_fields.currentRow() == 0
+
+    # Pindahkan f1 (index 1) ke paling bawah
+    editor.table_fields.selectRow(1)
+    editor._on_move_bottom_clicked()
+    assert [f.field_id for f in editor.fields] == ["f3", "f2", "f4", "f1"]
+    assert editor.table_fields.currentRow() == 3
+
+    # Naik 1 tingkat (f1 dari index 3 ke 2)
+    editor._on_move_up_clicked()
+    assert [f.field_id for f in editor.fields] == ["f3", "f2", "f1", "f4"]
+    assert editor.table_fields.currentRow() == 2
+
+    # Turun 1 tingkat (f2 dari index 1 ke 2)
+    editor.table_fields.selectRow(1)
+    editor._on_move_down_clicked()
+    assert [f.field_id for f in editor.fields] == ["f3", "f1", "f2", "f4"]
+    assert editor.table_fields.currentRow() == 2
+
+    editor.close()
+
+
+def test_template_editor_duplicate_field(qapp, sample_xlsx: str):
+    """Memverifikasi duplikasi field 1-klik."""
+    editor = TemplateEditorDialog()
+    editor.set_template_file(sample_xlsx)
+
+    f1 = PhotoFieldConfig("f1", "Foto Antenna Sector 1", "Antenna", "B5", sizing_mode="fit_to_cell")
+    editor.fields = [f1]
+    editor._refresh_fields_table()
+
+    editor.table_fields.selectRow(0)
+    editor._on_duplicate_field_clicked()
+
+    assert len(editor.fields) == 2
+    dup = editor.fields[1]
+    assert dup.field_id != f1.field_id
+    assert dup.label == "Foto Antenna Sector 1 (Salinan)"
+    assert dup.sheet_name == "Antenna"
+    assert dup.cell_anchor == "B5"
+    assert dup.sizing_mode == "fit_to_cell"
+    assert editor.table_fields.currentRow() == 1
+    editor.close()
+
+
+def test_template_editor_inline_editing(qapp, sample_xlsx: str):
+    """Memverifikasi in-place editing langsung pada tabel field tanpa membuka modal dialog."""
+    editor = TemplateEditorDialog()
+    editor.set_template_file(sample_xlsx)
+
+    f1 = PhotoFieldConfig("f1", "Label Awal", "Antenna", "B5")
+    editor.fields = [f1]
+    editor._refresh_fields_table()
+
+    # Ubah label via cell widget
+    edit_label = editor.table_fields.cellWidget(0, 1)
+    assert edit_label is not None
+    edit_label.setText("Label Diedit Langsung")
+    assert editor.fields[0].label == "Label Diedit Langsung"
+    assert editor.table_fields.item(0, 1).text() == "Label Diedit Langsung"
+
+    # Ubah sheet target via cell widget
+    combo_sheet = editor.table_fields.cellWidget(0, 3)
+    assert combo_sheet is not None
+    combo_sheet.setCurrentText("Equipment")
+    assert editor.fields[0].sheet_name == "Equipment"
+    assert editor.table_fields.item(0, 3).text() == "Equipment"
+
+    # Ubah sel anchor via cell widget
+    edit_cell = editor.table_fields.cellWidget(0, 4)
+    assert edit_cell is not None
+    edit_cell.setText("D12")
+    assert editor.fields[0].cell_anchor == "D12"
+    assert editor.table_fields.item(0, 4).text() == "D12"
+
+    editor.close()
+
+
+def test_template_editor_export_and_import_json(qapp, sample_xlsx: str, tmp_path: Path, monkeypatch):
+    """Memverifikasi fitur Export dan Import field dari/ke file JSON (mode Replace dan Append)."""
+    import json
+    from PySide6.QtWidgets import QFileDialog
+
+    editor = TemplateEditorDialog()
+    editor.set_template_file(sample_xlsx)
+
+    f_photo = PhotoFieldConfig("f_p", "Foto Antenna", "Antenna", "B5", field_type="photo", sizing_mode="fit_to_cell")
+    f_text = PhotoFieldConfig("f_t", "Nama Site", "Antenna", "A1", field_type="text", default_text="JKT-01")
+    editor.fields = [f_photo, f_text]
+    editor._refresh_fields_table()
+
+    json_export_path = str(tmp_path / "fields_exported.json")
+
+    # Mocks agar modal dialog QMessageBox tidak memblokir jalannya pengujian
+    monkeypatch.setattr(QMessageBox, "information", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
+
+    # 1. Test Export JSON
+    monkeypatch.setattr(
+        QFileDialog,
+        "getSaveFileName",
+        lambda *args, **kwargs: (json_export_path, "JSON Files (*.json)"),
+    )
+    editor._on_export_json_clicked()
+    assert Path(json_export_path).is_file()
+
+    with open(json_export_path, "r", encoding="utf-8") as fp:
+        exported_data = json.load(fp)
+    fields_exported = exported_data.get("fields", exported_data)
+    assert len(fields_exported) == 2
+    assert fields_exported[0]["label"] == "Foto Antenna"
+    assert fields_exported[1]["label"] == "Nama Site"
+
+    # 2. Test Import JSON - Mode Replace ("Ganti Semua")
+    monkeypatch.setattr(
+        QFileDialog,
+        "getOpenFileName",
+        lambda *args, **kwargs: (json_export_path, "JSON Files (*.json)"),
+    )
+
+    def mock_exec_replace(self):
+        for btn in self.buttons():
+            if "Ganti Semua" in btn.text():
+                self._clicked_btn = btn
+                return 0
+        return 0
+
+    monkeypatch.setattr(QMessageBox, "exec", mock_exec_replace)
+    monkeypatch.setattr(QMessageBox, "clickedButton", lambda self: getattr(self, "_clicked_btn", None))
+
+    # Ubah fields editor ke dummy dulu
+    editor.fields = [PhotoFieldConfig("dummy", "Dummy", "Sheet1", "A1")]
+    editor._on_import_json_clicked()
+    assert len(editor.fields) == 2
+    assert editor.fields[0].label == "Foto Antenna"
+    assert editor.fields[1].label == "Nama Site"
+
+    # 3. Test Import JSON - Mode Append ("Tambahkan")
+    def mock_exec_append(self):
+        for btn in self.buttons():
+            if "Tambahkan" in btn.text():
+                self._clicked_btn = btn
+                return 0
+        return 0
+
+    monkeypatch.setattr(QMessageBox, "exec", mock_exec_append)
+    editor._on_import_json_clicked()
+    assert len(editor.fields) == 4
+
+    editor.close()
+
+
+
 

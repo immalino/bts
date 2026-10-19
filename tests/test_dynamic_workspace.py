@@ -375,19 +375,20 @@ def test_main_window_mixed_workspace_and_auto_save(qapp, tmp_path: Path, dummy_i
     window.set_project(proj)
 
     assert len(window.dynamic_rows) == 2
-    assert isinstance(window.dynamic_rows[0], DynamicPhotoRow)
-    assert isinstance(window.dynamic_rows[1], DynamicTextRow)
+    # Field teks dipisahkan di bagian atas, field foto di bagian bawah
+    assert isinstance(window.dynamic_rows[0], DynamicTextRow)
+    assert isinstance(window.dynamic_rows[1], DynamicPhotoRow)
 
-    # Verifikasi default_text dimuat otomatis ke text row
-    assert window.dynamic_rows[1].get_text() == "72M"
-    assert window.dynamic_rows[1].lbl_status.text() == DynamicRowStatus.FILLED
+    # Verifikasi default_text dimuat otomatis ke text row (row 0)
+    assert window.dynamic_rows[0].get_text() == "72M"
+    assert window.dynamic_rows[0].lbl_status.text() == DynamicRowStatus.FILLED
 
-    # Pasang foto di row 0
-    window.dynamic_rows[0].set_photo(dummy_image_file)
+    # Pasang foto di row 1 (photo row)
+    window.dynamic_rows[1].set_photo(dummy_image_file)
     assert proj.photo_assignments["p1"] == dummy_image_file
 
-    # Ubah teks di row 1
-    window.dynamic_rows[1].set_text("85 Meter High")
+    # Ubah teks di row 0 (text row)
+    window.dynamic_rows[0].set_text("85 Meter High")
 
     # Verifikasi tersimpan di memory dan di disk
     assert window.current_project.text_assignments["t1"] == "85 Meter High"

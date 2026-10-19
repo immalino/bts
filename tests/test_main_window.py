@@ -147,3 +147,88 @@ def test_main_window_reset_all(main_window):
     assert main_window.get_output_directory() == ""
     assert main_window.is_overwrite_allowed() is False
     assert main_window.row_widgets[0].get_data()["target_stem"] == ""
+
+
+def test_workspace_text_fields_separated_at_top_with_headers(main_window):
+    """
+    Verifikasi bahwa pada workspace dynamic, field teks dipisahkan di bagian atas
+    dan field foto di bagian bawah dengan header seksi masing-masing.
+    """
+    from src.core.models import PhotoFieldConfig, TemplateConfig
+    from src.ui.dynamic_row import DynamicPhotoRow, DynamicTextRow
+
+    fields = [
+        PhotoFieldConfig("p1", "Foto Antenna 1", "Sheet1", "B5", field_type="photo"),
+        PhotoFieldConfig("t1", "Nama Site", "Sheet1", "A1", field_type="text"),
+        PhotoFieldConfig("p2", "Foto Rack Power", "Sheet2", "B10", field_type="photo"),
+        PhotoFieldConfig("t2", "Nama Teknisi", "Sheet1", "A2", field_type="text"),
+    ]
+    template = TemplateConfig(
+        template_id="tpl_mixed",
+        name="Template Mix",
+        template_file_path="/dummy/test.xlsx",
+        fields=fields,
+    )
+
+    main_window.render_dynamic_workspace(template)
+
+    # Pastikan total row 4
+    assert len(main_window.dynamic_rows) == 4
+
+    # Dua baris teratas HARUS bertipe DynamicTextRow
+    assert isinstance(main_window.dynamic_rows[0], DynamicTextRow)
+    assert main_window.dynamic_rows[0].get_field_id() == "t1"
+    assert main_window.dynamic_rows[0].row_index == 1
+
+    assert isinstance(main_window.dynamic_rows[1], DynamicTextRow)
+    assert main_window.dynamic_rows[1].get_field_id() == "t2"
+    assert main_window.dynamic_rows[1].row_index == 2
+
+    # Dua baris berikutnya HARUS bertipe DynamicPhotoRow
+    assert isinstance(main_window.dynamic_rows[2], DynamicPhotoRow)
+    assert main_window.dynamic_rows[2].get_field_id() == "p1"
+    assert main_window.dynamic_rows[2].row_index == 3
+
+    assert isinstance(main_window.dynamic_rows[3], DynamicPhotoRow)
+    assert main_window.dynamic_rows[3].get_field_id() == "p2"
+    assert main_window.dynamic_rows[3].row_index == 4
+
+    main_window.show()
+    # Header seksi harus ada dan visible
+    assert main_window.text_section_header is not None
+    assert main_window.photo_section_header is not None
+    assert not main_window.text_section_header.isHidden()
+    assert not main_window.photo_section_header.isHidden()
+
+
+def test_workspace_filters_toggle_section_headers(main_window):
+    """Verifikasi bahwa pencarian/filter menyembunyikan header seksi jika tidak ada baris yang cocok."""
+    from src.core.models import PhotoFieldConfig, TemplateConfig
+
+    main_window.show()
+    fields = [
+        PhotoFieldConfig("p1", "Foto Antenna Sector 1", "Sheet1", "B5", field_type="photo"),
+        PhotoFieldConfig("t1", "Nama Site BTS", "Sheet1", "A1", field_type="text"),
+    ]
+    template = TemplateConfig(
+        template_id="tpl_filter",
+        name="Template Filter",
+        template_file_path="/dummy/test.xlsx",
+        fields=fields,
+    )
+    main_window.render_dynamic_workspace(template)
+
+    # Cari kata kunci yang hanya cocok dengan teks
+    main_window.input_search.setText("Site BTS")
+    assert not main_window.text_section_header.isHidden()
+    assert main_window.photo_section_header.isHidden()
+
+    # Cari kata kunci yang hanya cocok dengan foto
+    main_window.input_search.setText("Antenna")
+    assert main_window.text_section_header.isHidden()
+    assert not main_window.photo_section_header.isHidden()
+
+    # Bersihkan pencarian -> kedua header tampil kembali
+    main_window.input_search.setText("")
+    assert not main_window.text_section_header.isHidden()
+    assert not main_window.photo_section_header.isHidden()

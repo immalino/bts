@@ -5,13 +5,14 @@ auto-load nama sheet dari file .xlsx, editor tabel field foto, dan integrasi den
 """
 
 from datetime import datetime
+import json
 import os
 from pathlib import Path
 from typing import List, Optional
 import uuid
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
@@ -40,6 +41,36 @@ from src.core.models import PhotoFieldConfig, TemplateConfig
 from src.core.storage import StorageManager
 from src.ui.icons import get_icon, render_svg_pixmap
 from src.utils.excel_utils import get_sheet_names_from_excel, is_valid_cell_coordinate
+
+
+class FocusSelectingLineEdit(QLineEdit):
+    """QLineEdit yang otomatis memilih baris tabel tempat widget berada saat difokuskan."""
+
+    def __init__(
+        self, row: int, table: QTableWidget, parent: Optional[QWidget] = None
+    ) -> None:
+        super().__init__(parent)
+        self.row = row
+        self.table = table
+
+    def focusInEvent(self, event) -> None:
+        self.table.selectRow(self.row)
+        super().focusInEvent(event)
+
+
+class FocusSelectingComboBox(QComboBox):
+    """QComboBox yang otomatis memilih baris tabel tempat widget berada saat difokuskan."""
+
+    def __init__(
+        self, row: int, table: QTableWidget, parent: Optional[QWidget] = None
+    ) -> None:
+        super().__init__(parent)
+        self.row = row
+        self.table = table
+
+    def focusInEvent(self, event) -> None:
+        self.table.selectRow(self.row)
+        super().focusInEvent(event)
 
 
 class FieldEditDialog(QDialog):
@@ -149,6 +180,7 @@ class FieldEditDialog(QDialog):
         form_layout.addWidget(self.lbl_field_label)
 
         self.edit_label = QLineEdit(form_group)
+        self.edit_label.setFixedHeight(34)
         self.edit_label.setPlaceholderText("Contoh: Foto Antenna Sector 1")
         form_layout.addWidget(self.edit_label)
 
@@ -164,6 +196,7 @@ class FieldEditDialog(QDialog):
 
         self.combo_sheet = QComboBox(form_group)
         self.combo_sheet.setEditable(True)
+        self.combo_sheet.setFixedHeight(34)
         self.combo_sheet.setPlaceholderText("Pilih atau ketik sheet...")
         if self.available_sheets:
             self.combo_sheet.addItems(self.available_sheets)
@@ -177,6 +210,7 @@ class FieldEditDialog(QDialog):
         cell_col.addWidget(lbl_cell)
 
         self.edit_cell = QLineEdit(form_group)
+        self.edit_cell.setFixedHeight(34)
         self.edit_cell.setPlaceholderText("Contoh: B5")
         cell_col.addWidget(self.edit_cell)
         coord_layout.addLayout(cell_col, stretch=1)
@@ -194,6 +228,7 @@ class FieldEditDialog(QDialog):
         text_opt_layout.addWidget(lbl_def_text)
 
         self.edit_default_text = QLineEdit(self.text_options_container)
+        self.edit_default_text.setFixedHeight(34)
         self.edit_default_text.setPlaceholderText("Contoh: Menara BTS 72M atau biarkan kosong...")
         text_opt_layout.addWidget(self.edit_default_text)
 
@@ -230,6 +265,7 @@ class FieldEditDialog(QDialog):
         lbl_w.setStyleSheet(f"font-size: 11px; color: {ThemeColors.TEXT_MUTED};")
         custom_w_layout.addWidget(lbl_w)
         self.spin_width = QSpinBox(self.photo_options_container)
+        self.spin_width.setFixedHeight(34)
         self.spin_width.setRange(10, 5000)
         self.spin_width.setValue(400)
         self.spin_width.setEnabled(False)
@@ -242,6 +278,7 @@ class FieldEditDialog(QDialog):
         lbl_h.setStyleSheet(f"font-size: 11px; color: {ThemeColors.TEXT_MUTED};")
         custom_h_layout.addWidget(lbl_h)
         self.spin_height = QSpinBox(self.photo_options_container)
+        self.spin_height.setFixedHeight(34)
         self.spin_height.setRange(10, 5000)
         self.spin_height.setValue(300)
         self.spin_height.setEnabled(False)
@@ -255,6 +292,7 @@ class FieldEditDialog(QDialog):
         lbl_p.setStyleSheet(f"font-size: 11px; color: {ThemeColors.TEXT_MUTED};")
         padding_layout.addWidget(lbl_p)
         self.spin_padding = QSpinBox(self.photo_options_container)
+        self.spin_padding.setFixedHeight(34)
         self.spin_padding.setRange(0, 100)
         self.spin_padding.setValue(2)
         padding_layout.addWidget(self.spin_padding)
@@ -298,6 +336,7 @@ class FieldEditDialog(QDialog):
         self.btn_cancel = QPushButton("Batal", self)
         self.btn_cancel.setIcon(get_icon("x", size=14))
         self.btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_cancel.setFixedHeight(36)
         self.btn_cancel.clicked.connect(self.reject)
         footer_layout.addWidget(self.btn_cancel)
 
@@ -305,6 +344,7 @@ class FieldEditDialog(QDialog):
         self.btn_save.setObjectName("PrimaryButton")
         self.btn_save.setIcon(get_icon("check", color="#FFFFFF", size=14))
         self.btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_save.setFixedHeight(36)
         self.btn_save.setDefault(True)
         self.btn_save.clicked.connect(self._on_save_clicked)
         footer_layout.addWidget(self.btn_save)
@@ -478,8 +518,8 @@ class TemplateEditorDialog(QDialog):
     def _init_ui(self) -> None:
         title = "Edit Template Laporan" if self.template else "Buat Template Laporan Baru"
         self.setWindowTitle(title)
-        self.resize(840, 650)
-        self.setMinimumSize(740, 540)
+        self.resize(960, 680)
+        self.setMinimumSize(820, 560)
         self.setModal(True)
 
         if APP_ICON_PNG.is_file():
@@ -534,6 +574,7 @@ class TemplateEditorDialog(QDialog):
         name_layout.addWidget(lbl_name)
 
         self.edit_name = QLineEdit(meta_card)
+        self.edit_name.setFixedHeight(34)
         self.edit_name.setPlaceholderText("Contoh: Template Telkomsel BTS 4G / 5G")
         name_layout.addWidget(self.edit_name)
         meta_layout.addLayout(name_layout)
@@ -549,6 +590,7 @@ class TemplateEditorDialog(QDialog):
         file_browse_layout.setSpacing(8)
 
         self.edit_file_path = QLineEdit(meta_card)
+        self.edit_file_path.setFixedHeight(34)
         self.edit_file_path.setPlaceholderText("Pilih atau masukkan path file .xlsx template...")
         self.edit_file_path.textChanged.connect(self._on_file_path_changed)
         file_browse_layout.addWidget(self.edit_file_path, stretch=1)
@@ -556,6 +598,7 @@ class TemplateEditorDialog(QDialog):
         self.btn_browse = QPushButton("Pilih File .xlsx", meta_card)
         self.btn_browse.setIcon(get_icon("folder", size=14))
         self.btn_browse.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_browse.setFixedHeight(34)
         self.btn_browse.clicked.connect(self._on_browse_file_clicked)
         file_browse_layout.addWidget(self.btn_browse)
 
@@ -576,6 +619,7 @@ class TemplateEditorDialog(QDialog):
         pattern_layout.addWidget(lbl_pattern)
 
         self.edit_output_filename_pattern = QLineEdit(meta_card)
+        self.edit_output_filename_pattern.setFixedHeight(34)
         self.edit_output_filename_pattern.setPlaceholderText("Contoh: Laporan_{site_name}_{date} atau {template_name}_{site_name}_{Nama Site}")
         pattern_layout.addWidget(self.edit_output_filename_pattern)
 
@@ -590,54 +634,132 @@ class TemplateEditorDialog(QDialog):
         layout.addWidget(meta_card)
 
         # 3. Fields Section
-        fields_header_layout = QHBoxLayout()
+        fields_section_layout = QVBoxLayout()
+        fields_section_layout.setSpacing(6)
+
+        # Baris Header: Judul, Indikator Jumlah & Aksi JSON
+        fields_header_top = QHBoxLayout()
         lbl_fields_title = QLabel("Daftar Field", self)
         lbl_fields_title.setStyleSheet(f"""
             font-size: 13px;
             font-weight: 700;
             color: {ThemeColors.TEXT};
         """)
-        fields_header_layout.addWidget(lbl_fields_title)
+        fields_header_top.addWidget(lbl_fields_title)
 
-        fields_header_layout.addStretch(1)
+        self.lbl_fields_count = QLabel("(0 field)", self)
+        self.lbl_fields_count.setStyleSheet(f"font-size: 11px; color: {ThemeColors.TEXT_MUTED};")
+        fields_header_top.addWidget(self.lbl_fields_count)
 
-        # Toolbar Tombol Field
+        fields_header_top.addStretch(1)
+
+        self.btn_sample_json = QPushButton("Contoh JSON", self)
+        self.btn_sample_json.setIcon(get_icon("file_text", size=14))
+        self.btn_sample_json.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_sample_json.setFixedHeight(28)
+        self.btn_sample_json.setToolTip("Unduh berkas contoh format JSON untuk konfigurasi field")
+        self.btn_sample_json.clicked.connect(self._on_sample_json_clicked)
+        fields_header_top.addWidget(self.btn_sample_json)
+
+        self.btn_import_json = QPushButton("Import JSON", self)
+        self.btn_import_json.setIcon(get_icon("upload_cloud", size=14))
+        self.btn_import_json.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_import_json.setFixedHeight(28)
+        self.btn_import_json.setToolTip("Impor konfigurasi field dari berkas JSON")
+        self.btn_import_json.clicked.connect(self._on_import_json_clicked)
+        fields_header_top.addWidget(self.btn_import_json)
+
+        self.btn_export_json = QPushButton("Export JSON", self)
+        self.btn_export_json.setIcon(get_icon("download", size=14))
+        self.btn_export_json.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_export_json.setFixedHeight(28)
+        self.btn_export_json.setToolTip("Ekspor daftar field saat ini ke berkas JSON")
+        self.btn_export_json.clicked.connect(self._on_export_json_clicked)
+        fields_header_top.addWidget(self.btn_export_json)
+
+        fields_section_layout.addLayout(fields_header_top)
+
+        # Baris Toolbar: Tombol Operasi Field & Navigasi Urutan Lengkap
+        fields_toolbar = QHBoxLayout()
+        fields_toolbar.setSpacing(6)
+
         self.btn_add_field = QPushButton("Tambah Field", self)
         self.btn_add_field.setIcon(get_icon("plus", color="#FFFFFF", size=14))
         self.btn_add_field.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_add_field.setFixedHeight(34)
         self.btn_add_field.clicked.connect(self._on_add_field_clicked)
-        fields_header_layout.addWidget(self.btn_add_field)
+        fields_toolbar.addWidget(self.btn_add_field)
 
-        self.btn_edit_field = QPushButton("Edit Field", self)
-        self.btn_edit_field.setIcon(get_icon("file_text", size=14))
+        self.btn_duplicate_field = QPushButton("Duplikat", self)
+        self.btn_duplicate_field.setIcon(get_icon("copy", size=14))
+        self.btn_duplicate_field.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_duplicate_field.setFixedHeight(34)
+        self.btn_duplicate_field.setToolTip("Duplikat field yang dipilih")
+        self.btn_duplicate_field.setEnabled(False)
+        self.btn_duplicate_field.clicked.connect(self._on_duplicate_field_clicked)
+        fields_toolbar.addWidget(self.btn_duplicate_field)
+
+        self.btn_edit_field = QPushButton("Edit Detail", self)
+        self.btn_edit_field.setIcon(get_icon("edit", size=14))
         self.btn_edit_field.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_edit_field.setFixedHeight(34)
+        self.btn_edit_field.setToolTip("Buka dialog untuk mengubah pengaturan ukuran/padding")
         self.btn_edit_field.setEnabled(False)
         self.btn_edit_field.clicked.connect(self._on_edit_field_clicked)
-        fields_header_layout.addWidget(self.btn_edit_field)
+        fields_toolbar.addWidget(self.btn_edit_field)
 
-        self.btn_delete_field = QPushButton("Hapus Field", self)
+        self.btn_delete_field = QPushButton("Hapus", self)
         self.btn_delete_field.setIcon(get_icon("trash", size=14))
         self.btn_delete_field.setObjectName("DangerButton")
         self.btn_delete_field.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_delete_field.setFixedHeight(34)
         self.btn_delete_field.setEnabled(False)
         self.btn_delete_field.clicked.connect(self._on_delete_field_clicked)
-        fields_header_layout.addWidget(self.btn_delete_field)
+        fields_toolbar.addWidget(self.btn_delete_field)
+
+        fields_toolbar.addSpacing(10)
+
+        # Navigasi Urutan: Paling Atas, Naik 1 Tingkat, Turun 1 Tingkat, Paling Bawah
+        self.btn_move_top = QPushButton("Paling Atas", self)
+        self.btn_move_top.setIcon(get_icon("chevrons_up", size=14))
+        self.btn_move_top.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_move_top.setFixedHeight(34)
+        self.btn_move_top.setToolTip("Pindahkan field ke baris paling pertama")
+        self.btn_move_top.setEnabled(False)
+        self.btn_move_top.clicked.connect(self._on_move_top_clicked)
+        fields_toolbar.addWidget(self.btn_move_top)
 
         self.btn_move_up = QPushButton("Naik", self)
         self.btn_move_up.setIcon(get_icon("arrow_up", size=14))
         self.btn_move_up.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_move_up.setFixedHeight(34)
+        self.btn_move_up.setToolTip("Geser field naik 1 tingkat")
         self.btn_move_up.setEnabled(False)
         self.btn_move_up.clicked.connect(self._on_move_up_clicked)
-        fields_header_layout.addWidget(self.btn_move_up)
+        fields_toolbar.addWidget(self.btn_move_up)
 
         self.btn_move_down = QPushButton("Turun", self)
         self.btn_move_down.setIcon(get_icon("arrow_down", size=14))
         self.btn_move_down.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_move_down.setFixedHeight(34)
+        self.btn_move_down.setToolTip("Geser field turun 1 tingkat")
         self.btn_move_down.setEnabled(False)
         self.btn_move_down.clicked.connect(self._on_move_down_clicked)
-        fields_header_layout.addWidget(self.btn_move_down)
+        fields_toolbar.addWidget(self.btn_move_down)
 
-        layout.addLayout(fields_header_layout)
+        self.btn_move_bottom = QPushButton("Paling Bawah", self)
+        self.btn_move_bottom.setIcon(get_icon("chevrons_down", size=14))
+        self.btn_move_bottom.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_move_bottom.setFixedHeight(34)
+        self.btn_move_bottom.setToolTip("Pindahkan field ke baris paling terakhir")
+        self.btn_move_bottom.setEnabled(False)
+        self.btn_move_bottom.clicked.connect(self._on_move_bottom_clicked)
+        fields_toolbar.addWidget(self.btn_move_bottom)
+
+        fields_toolbar.addStretch(1)
+
+        fields_section_layout.addLayout(fields_toolbar)
+        layout.addLayout(fields_section_layout)
 
         # Table Fields
         self.table_fields = QTableWidget(self)
@@ -656,6 +778,8 @@ class TemplateEditorDialog(QDialog):
         self.table_fields.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table_fields.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_fields.verticalHeader().setVisible(False)
+        self.table_fields.verticalHeader().setDefaultSectionSize(44)
+        self.table_fields.verticalHeader().setMinimumSectionSize(40)
         self.table_fields.itemSelectionChanged.connect(self._on_field_selection_changed)
         self.table_fields.itemDoubleClicked.connect(self._on_field_table_double_clicked)
 
@@ -679,6 +803,7 @@ class TemplateEditorDialog(QDialog):
         self.btn_cancel = QPushButton("Batal", self)
         self.btn_cancel.setIcon(get_icon("x", size=16))
         self.btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_cancel.setFixedHeight(36)
         self.btn_cancel.clicked.connect(self.reject)
         footer_layout.addWidget(self.btn_cancel)
 
@@ -686,6 +811,7 @@ class TemplateEditorDialog(QDialog):
         self.btn_save.setObjectName("PrimaryButton")
         self.btn_save.setIcon(get_icon("check", color="#ffffff", size=16))
         self.btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_save.setFixedHeight(36)
         self.btn_save.setDefault(True)
         self.btn_save.clicked.connect(self._on_save_template_clicked)
         footer_layout.addWidget(self.btn_save)
@@ -695,7 +821,9 @@ class TemplateEditorDialog(QDialog):
     def _load_initial_data(self) -> None:
         if self.template:
             self.edit_name.setText(self.template.name)
+            self.edit_file_path.blockSignals(True)
             self.edit_file_path.setText(self.template.template_file_path)
+            self.edit_file_path.blockSignals(False)
             self.edit_output_filename_pattern.setText(
                 getattr(self.template, "output_filename_pattern", "")
             )
@@ -707,6 +835,7 @@ class TemplateEditorDialog(QDialog):
         """Set file path template dan muat daftar sheet."""
         self.edit_file_path.setText(file_path)
         self.load_sheet_names(file_path)
+        self._refresh_fields_table()
 
     def load_sheet_names(self, file_path: str) -> List[str]:
         """
@@ -741,6 +870,7 @@ class TemplateEditorDialog(QDialog):
     def _on_file_path_changed(self, text: str) -> None:
         if Path(text.strip()).is_file():
             self.load_sheet_names(text.strip())
+            self._refresh_fields_table()
 
     def _on_browse_file_clicked(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(
@@ -753,32 +883,136 @@ class TemplateEditorDialog(QDialog):
             self.set_template_file(file_path)
 
     def _refresh_fields_table(self) -> None:
+        self._is_populating_table = True
+
+        # Bersihkan seluruh cell widget lama agar tidak menjadi orphan/ghost di viewport
+        for r in range(self.table_fields.rowCount()):
+            for c in range(self.table_fields.columnCount()):
+                w = self.table_fields.cellWidget(r, c)
+                if w:
+                    self.table_fields.removeCellWidget(r, c)
+                    w.setParent(None)
+                    w.deleteLater()
+
+        for ch in list(self.table_fields.viewport().children()):
+            if isinstance(ch, (FocusSelectingLineEdit, FocusSelectingComboBox)):
+                ch.setParent(None)
+                ch.deleteLater()
+
         self.table_fields.setRowCount(len(self.fields))
+        if hasattr(self, "lbl_fields_count"):
+            self.lbl_fields_count.setText(f"({len(self.fields)} field)")
+
         for row_idx, fld in enumerate(self.fields):
             # 0: No
             item_no = QTableWidgetItem(str(row_idx + 1))
             item_no.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            item_no.setFlags(item_no.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table_fields.setItem(row_idx, 0, item_no)
 
-            # 1: Label
+            # 1: Label (In-place editable via FocusSelectingLineEdit)
             item_label = QTableWidgetItem(fld.label)
+            item_label.setForeground(QColor(0, 0, 0, 0))
             self.table_fields.setItem(row_idx, 1, item_label)
+
+            edit_label = FocusSelectingLineEdit(row_idx, self.table_fields)
+            edit_label.setText(fld.label)
+            edit_label.setPlaceholderText("Label field...")
+            edit_label.setFixedHeight(32)
+            edit_label.setStyleSheet(f"""
+                QLineEdit {{
+                    border: 1px solid {ThemeColors.BORDER};
+                    border-radius: 5px;
+                    padding: 4px 8px;
+                    font-size: 12px;
+                    background-color: {ThemeColors.SURFACE};
+                    color: {ThemeColors.TEXT};
+                }}
+                QLineEdit:hover {{
+                    border-color: {ThemeColors.BORDER_FOCUS};
+                }}
+                QLineEdit:focus {{
+                    border: 1.5px solid {ThemeColors.PRIMARY};
+                    background-color: {ThemeColors.SURFACE};
+                }}
+            """)
+            edit_label.textChanged.connect(
+                lambda text, r=row_idx: self._on_inline_label_changed(r, text)
+            )
+            self.table_fields.setCellWidget(row_idx, 1, edit_label)
 
             # 2: Tipe (Foto / Teks)
             fld_type = getattr(fld, "field_type", "photo")
             type_str = "Teks" if fld_type == "text" else "Foto"
             item_type = QTableWidgetItem(type_str)
             item_type.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            item_type.setFlags(item_type.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table_fields.setItem(row_idx, 2, item_type)
 
-            # 3: Sheet
-            item_sheet = QTableWidgetItem(fld.sheet_name)
+            # 3: Sheet Target (In-place editable via FocusSelectingComboBox)
+            item_sheet = QTableWidgetItem(fld.sheet_name or "")
+            item_sheet.setForeground(QColor(0, 0, 0, 0))
             self.table_fields.setItem(row_idx, 3, item_sheet)
 
-            # 4: Sel Anchor
-            item_cell = QTableWidgetItem(fld.cell_anchor)
-            item_cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            combo_sheet = FocusSelectingComboBox(row_idx, self.table_fields)
+            combo_sheet.setEditable(True)
+            combo_sheet.setFixedHeight(32)
+            combo_sheet.setStyleSheet(f"""
+                QComboBox {{
+                    border: 1px solid {ThemeColors.BORDER};
+                    border-radius: 5px;
+                    padding: 4px 8px;
+                    font-size: 12px;
+                    background-color: {ThemeColors.SURFACE};
+                    color: {ThemeColors.TEXT};
+                }}
+                QComboBox:hover {{
+                    border-color: {ThemeColors.BORDER_FOCUS};
+                }}
+                QComboBox:focus {{
+                    border: 1.5px solid {ThemeColors.PRIMARY};
+                }}
+            """)
+            if self.available_sheets:
+                combo_sheet.addItems(self.available_sheets)
+            if fld.sheet_name:
+                combo_sheet.setCurrentText(fld.sheet_name)
+            combo_sheet.currentTextChanged.connect(
+                lambda text, r=row_idx: self._on_inline_sheet_changed(r, text)
+            )
+            self.table_fields.setCellWidget(row_idx, 3, combo_sheet)
+
+            # 4: Sel Anchor (In-place editable via FocusSelectingLineEdit)
+            item_cell = QTableWidgetItem(fld.cell_anchor or "")
+            item_cell.setForeground(QColor(0, 0, 0, 0))
             self.table_fields.setItem(row_idx, 4, item_cell)
+
+            edit_cell = FocusSelectingLineEdit(row_idx, self.table_fields)
+            edit_cell.setText(fld.cell_anchor)
+            edit_cell.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            edit_cell.setPlaceholderText("B5")
+            edit_cell.setFixedHeight(32)
+            edit_cell.setStyleSheet(f"""
+                QLineEdit {{
+                    border: 1px solid {ThemeColors.BORDER};
+                    border-radius: 5px;
+                    padding: 4px 8px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    background-color: {ThemeColors.SURFACE};
+                    color: {ThemeColors.TEXT};
+                }}
+                QLineEdit:hover {{
+                    border-color: {ThemeColors.BORDER_FOCUS};
+                }}
+                QLineEdit:focus {{
+                    border: 1.5px solid {ThemeColors.PRIMARY};
+                }}
+            """)
+            edit_cell.textChanged.connect(
+                lambda text, r=row_idx, w=edit_cell: self._on_inline_cell_changed(r, text, w)
+            )
+            self.table_fields.setCellWidget(row_idx, 4, edit_cell)
 
             # 5: Mode Ukuran / Info
             if fld_type == "text":
@@ -791,12 +1025,14 @@ class TemplateEditorDialog(QDialog):
                     mode_str = "Auto-Fit Sel"
             item_mode = QTableWidgetItem(mode_str)
             item_mode.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            item_mode.setFlags(item_mode.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table_fields.setItem(row_idx, 5, item_mode)
 
             # 6: Padding
             pad_str = f"{fld.padding} px" if fld_type != "text" else "-"
             item_pad = QTableWidgetItem(pad_str)
             item_pad.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            item_pad.setFlags(item_pad.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table_fields.setItem(row_idx, 6, item_pad)
 
             # 7: Posisi
@@ -807,23 +1043,90 @@ class TemplateEditorDialog(QDialog):
                 align_str = "-"
             item_align = QTableWidgetItem(align_str)
             item_align.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            item_align.setFlags(item_align.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table_fields.setItem(row_idx, 7, item_align)
 
+        self._is_populating_table = False
         self._on_field_selection_changed()
+
+    def _on_inline_label_changed(self, row_idx: int, text: str) -> None:
+        if getattr(self, "_is_populating_table", False):
+            return
+        if 0 <= row_idx < len(self.fields):
+            self.fields[row_idx].label = text
+            it = self.table_fields.item(row_idx, 1)
+            if it:
+                it.setText(text)
+
+    def _on_inline_sheet_changed(self, row_idx: int, text: str) -> None:
+        if getattr(self, "_is_populating_table", False):
+            return
+        if 0 <= row_idx < len(self.fields):
+            self.fields[row_idx].sheet_name = text.strip()
+            it = self.table_fields.item(row_idx, 3)
+            if it:
+                it.setText(text.strip())
+
+    def _on_inline_cell_changed(self, row_idx: int, text: str, widget: QLineEdit) -> None:
+        if getattr(self, "_is_populating_table", False):
+            return
+        clean_text = text.strip().upper()
+        if 0 <= row_idx < len(self.fields):
+            self.fields[row_idx].cell_anchor = clean_text
+            it = self.table_fields.item(row_idx, 4)
+            if it:
+                it.setText(clean_text)
+
+        # Visual validation
+        if not clean_text or is_valid_cell_coordinate(clean_text):
+            widget.setStyleSheet(f"""
+                QLineEdit {{
+                    border: 1px solid {ThemeColors.BORDER};
+                    border-radius: 5px;
+                    padding: 4px 8px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    background-color: {ThemeColors.SURFACE};
+                    color: {ThemeColors.TEXT};
+                }}
+                QLineEdit:hover {{
+                    border-color: {ThemeColors.BORDER_FOCUS};
+                }}
+                QLineEdit:focus {{
+                    border: 1.5px solid {ThemeColors.PRIMARY};
+                }}
+            """)
+        else:
+            widget.setStyleSheet(f"""
+                QLineEdit {{
+                    border: 1.5px solid #EF4444;
+                    background-color: #FEF2F2;
+                    border-radius: 5px;
+                    padding: 4px 8px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: #991B1B;
+                }}
+            """)
 
     def _on_field_selection_changed(self) -> None:
         selected_rows = self.table_fields.selectionModel().selectedRows()
         has_sel = len(selected_rows) > 0
         self.btn_edit_field.setEnabled(has_sel)
+        self.btn_duplicate_field.setEnabled(has_sel)
         self.btn_delete_field.setEnabled(has_sel)
 
         if has_sel:
             row_idx = selected_rows[0].row()
+            self.btn_move_top.setEnabled(row_idx > 0)
             self.btn_move_up.setEnabled(row_idx > 0)
             self.btn_move_down.setEnabled(row_idx < len(self.fields) - 1)
+            self.btn_move_bottom.setEnabled(row_idx < len(self.fields) - 1)
         else:
+            self.btn_move_top.setEnabled(False)
             self.btn_move_up.setEnabled(False)
             self.btn_move_down.setEnabled(False)
+            self.btn_move_bottom.setEnabled(False)
 
     def _on_field_table_double_clicked(self, item: QTableWidgetItem) -> None:
         self._on_edit_field_clicked()
@@ -839,6 +1142,23 @@ class TemplateEditorDialog(QDialog):
                 self.fields.append(new_fld)
                 self._refresh_fields_table()
                 self.table_fields.selectRow(len(self.fields) - 1)
+
+    def _on_duplicate_field_clicked(self) -> None:
+        """Menduplikasi field yang dipilih secara instan."""
+        selected_rows = self.table_fields.selectionModel().selectedRows()
+        if not selected_rows:
+            return
+        row_idx = selected_rows[0].row()
+        orig_fld = self.fields[row_idx]
+
+        dup_data = orig_fld.to_dict()
+        dup_data["field_id"] = f"fld_{uuid.uuid4().hex[:8]}"
+        dup_data["label"] = f"{orig_fld.label} (Salinan)"
+        dup_fld = PhotoFieldConfig.from_dict(dup_data)
+
+        self.fields.insert(row_idx + 1, dup_fld)
+        self._refresh_fields_table()
+        self.table_fields.selectRow(row_idx + 1)
 
     def _on_edit_field_clicked(self) -> None:
         selected_rows = self.table_fields.selectionModel().selectedRows()
@@ -877,7 +1197,20 @@ class TemplateEditorDialog(QDialog):
             del self.fields[row_idx]
             self._refresh_fields_table()
 
+    def _on_move_top_clicked(self) -> None:
+        """Memindahkan field yang dipilih ke baris paling pertama (paling atas)."""
+        selected_rows = self.table_fields.selectionModel().selectedRows()
+        if not selected_rows:
+            return
+        row_idx = selected_rows[0].row()
+        if row_idx > 0:
+            item = self.fields.pop(row_idx)
+            self.fields.insert(0, item)
+            self._refresh_fields_table()
+            self.table_fields.selectRow(0)
+
     def _on_move_up_clicked(self) -> None:
+        """Menggeser field yang dipilih naik 1 tingkat."""
         selected_rows = self.table_fields.selectionModel().selectedRows()
         if not selected_rows:
             return
@@ -891,6 +1224,7 @@ class TemplateEditorDialog(QDialog):
             self.table_fields.selectRow(row_idx - 1)
 
     def _on_move_down_clicked(self) -> None:
+        """Menggeser field yang dipilih turun 1 tingkat."""
         selected_rows = self.table_fields.selectionModel().selectedRows()
         if not selected_rows:
             return
@@ -902,6 +1236,235 @@ class TemplateEditorDialog(QDialog):
             )
             self._refresh_fields_table()
             self.table_fields.selectRow(row_idx + 1)
+
+    def _on_move_bottom_clicked(self) -> None:
+        """Memindahkan field yang dipilih ke baris paling terakhir (paling bawah)."""
+        selected_rows = self.table_fields.selectionModel().selectedRows()
+        if not selected_rows:
+            return
+        row_idx = selected_rows[0].row()
+        if row_idx < len(self.fields) - 1:
+            item = self.fields.pop(row_idx)
+            self.fields.append(item)
+            self._refresh_fields_table()
+            self.table_fields.selectRow(len(self.fields) - 1)
+
+    def _on_export_json_clicked(self) -> None:
+        """Mengekspor seluruh konfigurasi field template ke berkas JSON."""
+        if not self.fields:
+            QMessageBox.warning(
+                self,
+                "Export Gagal",
+                "Belum ada field untuk diekspor. Silakan tambahkan field terlebih dahulu.",
+            )
+            return
+
+        tpl_name = self.edit_name.text().strip() or "template"
+        clean_tpl_name = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in tpl_name)
+        default_filename = f"fields_{clean_tpl_name}.json"
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Konfigurasi Field ke JSON",
+            default_filename,
+            "JSON Files (*.json);;Semua Berkas (*.*)",
+        )
+        if not file_path:
+            return
+
+        export_data = {
+            "version": "1.0",
+            "template_name": self.edit_name.text().strip(),
+            "export_date": datetime.now().isoformat(),
+            "total_fields": len(self.fields),
+            "fields": [f.to_dict() for f in self.fields],
+        }
+
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(export_data, f, indent=2, ensure_ascii=False)
+            QMessageBox.information(
+                self,
+                "Export Berhasil",
+                f"Berhasil mengekspor {len(self.fields)} konfigurasi field ke:\n{file_path}",
+            )
+        except Exception as err:
+            QMessageBox.critical(
+                self,
+                "Export Gagal",
+                f"Gagal menyimpan berkas JSON: {err}",
+            )
+
+    def _on_import_json_clicked(self) -> None:
+        """Mengimpor konfigurasi field dari berkas JSON (Append atau Replace)."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import Konfigurasi Field dari JSON",
+            "",
+            "JSON Files (*.json);;Semua Berkas (*.*)",
+        )
+        if not file_path:
+            return
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                raw_data = json.load(f)
+        except Exception as err:
+            QMessageBox.critical(
+                self,
+                "Import Gagal",
+                f"Gagal membaca berkas JSON: {err}",
+            )
+            return
+
+        # Parsing format list langsung maupun dict { 'fields': [...] }
+        if isinstance(raw_data, list):
+            field_list = raw_data
+        elif isinstance(raw_data, dict) and "fields" in raw_data and isinstance(raw_data["fields"], list):
+            field_list = raw_data["fields"]
+        else:
+            QMessageBox.warning(
+                self,
+                "Format Tidak Valid",
+                "Format JSON tidak dikenali. Berkas harus berupa daftar field [ {...} ] atau objek { \"fields\": [ {...} ] }.",
+            )
+            return
+
+        imported_fields: List[PhotoFieldConfig] = []
+        for item in field_list:
+            if not isinstance(item, dict):
+                continue
+            item_dict = dict(item)
+            # Pastikan selalu memiliki field_id unik agar tidak konflik
+            item_dict["field_id"] = f"fld_{uuid.uuid4().hex[:8]}"
+
+            try:
+                fld_obj = PhotoFieldConfig.from_dict(item_dict)
+                imported_fields.append(fld_obj)
+            except Exception:
+                pass
+
+        if not imported_fields:
+            QMessageBox.warning(
+                self,
+                "Import Gagal",
+                "Tidak ada field valid yang dapat diimpor dari berkas JSON tersebut.",
+            )
+            return
+
+        # Jika sudah ada field, tanyakan Append vs Replace
+        if self.fields:
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Mode Import Field")
+            msg_box.setText(
+                f"Ditemukan {len(imported_fields)} field dalam berkas JSON.\n"
+                f"Template saat ini sudah memiliki {len(self.fields)} field.\n\n"
+                "Pilih cara penggabungan:"
+            )
+            btn_replace = msg_box.addButton("Ganti Semua (Replace)", QMessageBox.ButtonRole.AcceptRole)
+            btn_append = msg_box.addButton("Tambahkan (Append)", QMessageBox.ButtonRole.ActionRole)
+            btn_cancel = msg_box.addButton("Batal", QMessageBox.ButtonRole.RejectRole)
+            msg_box.setDefaultButton(btn_append)
+            msg_box.exec()
+
+            clicked_btn = msg_box.clickedButton()
+            if clicked_btn == btn_cancel:
+                return
+            elif clicked_btn == btn_replace:
+                self.fields = imported_fields
+            else:
+                self.fields.extend(imported_fields)
+        else:
+            self.fields = imported_fields
+
+        self._refresh_fields_table()
+        QMessageBox.information(
+            self,
+            "Import Berhasil",
+            f"Berhasil mengimpor {len(imported_fields)} field. Total field sekarang: {len(self.fields)}.",
+        )
+
+    def _on_sample_json_clicked(self) -> None:
+        """Menyimpan berkas contoh format JSON konfigurasi field template."""
+        sample_file_path = Path("data/templates/template_fields_sample.json")
+        sample_data = None
+        if sample_file_path.is_file():
+            try:
+                with open(sample_file_path, "r", encoding="utf-8") as f:
+                    sample_data = json.load(f)
+            except Exception:
+                pass
+
+        if not sample_data:
+            sample_data = {
+                "version": "1.0",
+                "description": "Contoh Format Konfigurasi Field Template BTS Document Control",
+                "fields": [
+                    {
+                        "field_id": "fld_sample_01",
+                        "label": "Foto Antenna Sektor 1",
+                        "sheet_name": "Sheet1",
+                        "cell_anchor": "B5",
+                        "field_type": "photo",
+                        "sizing_mode": "fit_to_cell",
+                        "custom_width": 0,
+                        "custom_height": 0,
+                        "padding": 2,
+                        "alignment": "center",
+                        "default_text": "",
+                    },
+                    {
+                        "field_id": "fld_sample_02",
+                        "label": "Foto Rack Perangkat",
+                        "sheet_name": "Sheet1",
+                        "cell_anchor": "I5",
+                        "field_type": "photo",
+                        "sizing_mode": "custom",
+                        "custom_width": 400,
+                        "custom_height": 300,
+                        "padding": 4,
+                        "alignment": "top-left",
+                        "default_text": "",
+                    },
+                    {
+                        "field_id": "fld_sample_03",
+                        "label": "Nama Site",
+                        "sheet_name": "Sheet1",
+                        "cell_anchor": "C2",
+                        "field_type": "text",
+                        "sizing_mode": "fit_to_cell",
+                        "custom_width": 0,
+                        "custom_height": 0,
+                        "padding": 0,
+                        "alignment": "center",
+                        "default_text": "SITE-001",
+                    },
+                ],
+            }
+
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Simpan Contoh Format JSON Field",
+            "template_fields_contoh.json",
+            "JSON Files (*.json);;Semua Berkas (*.*)",
+        )
+        if not save_path:
+            return
+
+        try:
+            with open(save_path, "w", encoding="utf-8") as f:
+                json.dump(sample_data, f, indent=2, ensure_ascii=False)
+            QMessageBox.information(
+                self,
+                "Berhasil Disimpan",
+                f"Contoh format JSON berhasil disimpan ke:\n{save_path}",
+            )
+        except Exception as err:
+            QMessageBox.critical(
+                self,
+                "Gagal Menyimpan",
+                f"Gagal menyimpan contoh format JSON: {err}",
+            )
 
     def validate_form(self) -> bool:
         """
@@ -1083,12 +1646,14 @@ class TemplateManagerDialog(QDialog):
         self.btn_new.setObjectName("PrimaryButton")
         self.btn_new.setIcon(get_icon("plus", color="#ffffff", size=16))
         self.btn_new.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_new.setFixedHeight(34)
         self.btn_new.clicked.connect(self._on_new_template_clicked)
         toolbar_layout.addWidget(self.btn_new)
 
         self.btn_edit = QPushButton("Edit Template", self)
         self.btn_edit.setIcon(get_icon("file_spreadsheet", size=16))
         self.btn_edit.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_edit.setFixedHeight(34)
         self.btn_edit.setEnabled(False)
         self.btn_edit.clicked.connect(self._on_edit_template_clicked)
         toolbar_layout.addWidget(self.btn_edit)
@@ -1097,6 +1662,7 @@ class TemplateManagerDialog(QDialog):
         self.btn_delete.setObjectName("DangerButton")
         self.btn_delete.setIcon(get_icon("trash", color="#ef4444", size=16))
         self.btn_delete.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_delete.setFixedHeight(34)
         self.btn_delete.setEnabled(False)
         self.btn_delete.clicked.connect(self._on_delete_template_clicked)
         toolbar_layout.addWidget(self.btn_delete)
@@ -1117,6 +1683,8 @@ class TemplateManagerDialog(QDialog):
         self.table_templates.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table_templates.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_templates.verticalHeader().setVisible(False)
+        self.table_templates.verticalHeader().setDefaultSectionSize(42)
+        self.table_templates.verticalHeader().setMinimumSectionSize(38)
         self.table_templates.itemSelectionChanged.connect(self._on_template_selection_changed)
         self.table_templates.itemDoubleClicked.connect(self._on_template_double_clicked)
 
@@ -1136,6 +1704,7 @@ class TemplateManagerDialog(QDialog):
         self.btn_select.setObjectName("PrimaryButton")
         self.btn_select.setIcon(get_icon("check", color="#ffffff", size=16))
         self.btn_select.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_select.setFixedHeight(36)
         self.btn_select.setEnabled(False)
         self.btn_select.clicked.connect(self._on_select_template_clicked)
         footer_layout.addWidget(self.btn_select)
@@ -1145,6 +1714,7 @@ class TemplateManagerDialog(QDialog):
         self.btn_close = QPushButton("Tutup", self)
         self.btn_close.setIcon(get_icon("x", size=16))
         self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_close.setFixedHeight(36)
         self.btn_close.clicked.connect(self.reject)
         footer_layout.addWidget(self.btn_close)
 

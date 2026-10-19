@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "description": "Contoh Format Konfigurasi Field Template BTS Document Control",
+  "fields": [
+    {
+      "field_id": "fld_01",
+      "label": "Foto Antenna Sektor 1",
+      "sheet_name": "Sheet1",
+      "cell_anchor": "B5",
+      "field_type": "photo",
+      "sizing_mode": "fit_to_cell",
+      "custom_width": 0,
+      "custom_height": 0,
+      "padding": 2,
+      "alignment": "center",
+      "default_text": ""
+    },
+    {
+      "field_id": "fld_02",
+      "label": "Foto Rack Perangkat",
+      "sheet_name": "Sheet1",
+      "cell_anchor": "I5",
+      "field_type": "photo",
+      "sizing_mode": "custom",
+      "custom_width": 400,
+      "custom_height": 300,
+      "padding": 4,
+      "alignment": "top-left",
+      "default_text": ""
+    },
+    {
+      "field_id": "fld_03",
+      "label": "Nama Site",
+      "sheet_name": "Sheet1",
+      "cell_anchor": "C2",
+      "field_type": "text",
+      "sizing_mode": "fit_to_cell",
+      "custom_width": 0,
+      "custom_height": 0,
+      "padding": 0,
+      "alignment": "center",
+      "default_text": "SITE-001"
+    }
+  ]
+}
+

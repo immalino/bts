@@ -125,6 +125,7 @@ class NewProjectDialog(QDialog):
         form_layout.addWidget(lbl_site)
 
         self.edit_site_name = QLineEdit(form_group)
+        self.edit_site_name.setFixedHeight(34)
         self.edit_site_name.setPlaceholderText("Contoh: JKT-042 Pasar Minggu Telkomsel")
         form_layout.addWidget(self.edit_site_name)
 
@@ -137,11 +138,13 @@ class NewProjectDialog(QDialog):
         tpl_choice_layout.setSpacing(8)
 
         self.combo_template = QComboBox(form_group)
+        self.combo_template.setFixedHeight(34)
         tpl_choice_layout.addWidget(self.combo_template, stretch=1)
 
         self.btn_manage_tpl = QPushButton("Kelola Template", form_group)
         self.btn_manage_tpl.setIcon(get_icon("file_spreadsheet", size=16))
         self.btn_manage_tpl.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_manage_tpl.setFixedHeight(34)
         self.btn_manage_tpl.clicked.connect(self._on_manage_templates_clicked)
         tpl_choice_layout.addWidget(self.btn_manage_tpl)
 
@@ -158,6 +161,7 @@ class NewProjectDialog(QDialog):
         self.btn_cancel = QPushButton("Batal", self)
         self.btn_cancel.setIcon(get_icon("x", size=14))
         self.btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_cancel.setFixedHeight(36)
         self.btn_cancel.clicked.connect(self.reject)
         footer_layout.addWidget(self.btn_cancel)
 
@@ -165,6 +169,7 @@ class NewProjectDialog(QDialog):
         self.btn_create.setObjectName("PrimaryButton")
         self.btn_create.setIcon(get_icon("plus", color="#FFFFFF", size=14))
         self.btn_create.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_create.setFixedHeight(36)
         self.btn_create.setDefault(True)
         self.btn_create.clicked.connect(self._on_create_clicked)
         footer_layout.addWidget(self.btn_create)
@@ -308,6 +313,7 @@ class ProjectManagerDialog(QDialog):
         self.btn_new.setObjectName("PrimaryButton")
         self.btn_new.setIcon(get_icon("plus", color="#FFFFFF", size=14))
         self.btn_new.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_new.setFixedHeight(34)
         self.btn_new.clicked.connect(self._on_new_project_clicked)
         toolbar_layout.addWidget(self.btn_new)
 
@@ -315,6 +321,7 @@ class ProjectManagerDialog(QDialog):
         self.btn_delete.setObjectName("DangerButton")
         self.btn_delete.setIcon(get_icon("trash", size=14))
         self.btn_delete.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_delete.setFixedHeight(34)
         self.btn_delete.setEnabled(False)
         self.btn_delete.clicked.connect(self._on_delete_project_clicked)
         toolbar_layout.addWidget(self.btn_delete)
@@ -329,6 +336,7 @@ class ProjectManagerDialog(QDialog):
         self.input_search = QLineEdit(self)
         self.input_search.setPlaceholderText("Cari nama atau ID site...")
         self.input_search.setFixedWidth(220)
+        self.input_search.setFixedHeight(34)
         self.input_search.textChanged.connect(self._on_search_changed)
         toolbar_layout.addWidget(self.input_search)
 
@@ -347,6 +355,8 @@ class ProjectManagerDialog(QDialog):
         self.table_projects.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table_projects.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_projects.verticalHeader().setVisible(False)
+        self.table_projects.verticalHeader().setDefaultSectionSize(42)
+        self.table_projects.verticalHeader().setMinimumSectionSize(38)
         self.table_projects.itemSelectionChanged.connect(self._on_project_selection_changed)
         self.table_projects.itemDoubleClicked.connect(self._on_project_double_clicked)
 
@@ -366,6 +376,7 @@ class ProjectManagerDialog(QDialog):
         self.btn_open.setObjectName("PrimaryButton")
         self.btn_open.setIcon(get_icon("folder", color="#FFFFFF", size=14))
         self.btn_open.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_open.setFixedHeight(36)
         self.btn_open.setEnabled(False)
         self.btn_open.clicked.connect(self._on_open_project_clicked)
         footer_layout.addWidget(self.btn_open)
@@ -375,6 +386,7 @@ class ProjectManagerDialog(QDialog):
         self.btn_close = QPushButton("Tutup", self)
         self.btn_close.setIcon(get_icon("x", size=14))
         self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_close.setFixedHeight(36)
         self.btn_close.clicked.connect(self.reject)
         footer_layout.addWidget(self.btn_close)
 

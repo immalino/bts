@@ -405,16 +405,30 @@ QTableWidget {{
     gridline-color: {p.BORDER_LIGHT};
     font-size: 12px;
     color: {p.TEXT};
+    outline: none;
 }}
 
 QTableWidget::item {{
-    padding: 8px 10px;
+    padding: 4px 10px;
     border-bottom: 1px solid {p.BORDER_LIGHT};
+    outline: none;
+}}
+
+QTableWidget::item:focus {{
+    outline: none;
+    border: none;
 }}
 
 QTableWidget::item:selected {{
     background-color: {p.PRIMARY_LIGHT};
     color: {p.PRIMARY};
+    outline: none;
+}}
+
+QTableWidget::item:selected:focus {{
+    background-color: {p.PRIMARY_LIGHT};
+    color: {p.PRIMARY};
+    outline: none;
 }}
 
 QHeaderView::section {{
@@ -425,6 +439,7 @@ QHeaderView::section {{
     padding: 8px 10px;
     border: none;
     border-bottom: 1px solid {p.BORDER};
+    min-height: 26px;
 }}
 
 /* ==========================================================================

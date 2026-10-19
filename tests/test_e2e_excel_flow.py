@@ -337,10 +337,17 @@ def test_e2e_mixed_photo_and_text_excel_generation(
     window = MainWindow(storage=storage)
     window.set_project(project)
 
+    # Di workspace, field teks dipisahkan di bagian atas dan foto di bagian bawah:
+    # Row 0: t_site (text)
+    # Row 1: t_eng (text, default "Budi (Lead)")
+    # Row 2: f_ant (photo)
+    photo_row = next(r for r in window.dynamic_rows if r.get_field_id() == "f_ant")
+    text_site_row = next(r for r in window.dynamic_rows if r.get_field_id() == "t_site")
+
     # 1. Pasang foto ke field foto
-    window.dynamic_rows[0].set_photo(photo1)
+    photo_row.set_photo(photo1)
     # 2. Ketik teks ke field teks
-    window.dynamic_rows[1].set_text("PASAR-MINGGU-042")
+    text_site_row.set_text("PASAR-MINGGU-042")
     # 3. Field teks ke-3 dibiarkan default ("Budi (Lead)")
 
     out_file = str(tmp_path / "output_mixed_final.xlsx")
@@ -409,9 +416,11 @@ def test_e2e_template_output_filename_pattern_applied(
     window = MainWindow(storage=storage)
     window.set_project(project)
 
-    # Isi foto dan teks pada baris dinamis
-    window.dynamic_rows[0].set_photo(photo1)
-    window.dynamic_rows[1].set_text("BTS-7788")
+    # Isi foto dan teks pada baris dinamis (teks di atas, foto di bawah)
+    photo_row = next(r for r in window.dynamic_rows if r.get_field_id() == "fld_p1")
+    text_row = next(r for r in window.dynamic_rows if r.get_field_id() == "fld_site_id")
+    photo_row.set_photo(photo1)
+    text_row.set_text("BTS-7788")
 
     captured_save_path = []
 

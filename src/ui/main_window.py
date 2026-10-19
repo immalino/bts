@@ -49,6 +49,60 @@ from src.utils.file_utils import open_folder_in_explorer, reveal_in_explorer, sp
 
 
 
+class WorkspaceSectionHeader(QFrame):
+    """Widget header pembatas seksi antara Field Teks dan Field Foto di workspace."""
+
+    def __init__(self, title: str, count_text: str, icon_name: str, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.title_text = title
+        self.count_text = count_text
+        self.icon_name = icon_name
+        self.setFixedHeight(34)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 2, 12, 2)
+        layout.setSpacing(8)
+
+        self.lbl_icon = QLabel(self)
+        layout.addWidget(self.lbl_icon)
+
+        self.lbl_title = QLabel(title, self)
+        layout.addWidget(self.lbl_title)
+
+        self.lbl_badge = QLabel(count_text, self)
+        layout.addWidget(self.lbl_badge)
+        layout.addStretch()
+
+        self.apply_theme(ThemeManager.instance().get_palette())
+
+    def apply_theme(self, palette: ThemePalette) -> None:
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {palette.SURFACE_ALT};
+                border: 1px solid {palette.BORDER};
+                border-radius: 6px;
+                margin-top: 4px;
+                margin-bottom: 2px;
+            }}
+        """)
+        self.lbl_icon.setPixmap(render_svg_pixmap(self.icon_name, color=palette.PRIMARY, size=15))
+        self.lbl_title.setStyleSheet(f"""
+            font-size: 11px;
+            font-weight: 700;
+            color: {palette.TEXT};
+            background: transparent;
+            border: none;
+            letter-spacing: 0.5px;
+        """)
+        self.lbl_badge.setStyleSheet(f"""
+            font-size: 11px;
+            font-weight: 600;
+            color: {palette.TEXT_MUTED};
+            background: transparent;
+            border: none;
+        """)
+
+
 class MainWindow(QMainWindow):
     """
     Jendela Utama Aplikasi Photo Rename Studio.
@@ -71,6 +125,8 @@ class MainWindow(QMainWindow):
         self.current_project: Optional[ProjectData] = None
         self.current_template: Optional[TemplateConfig] = None
         self.dynamic_rows: List[DynamicPhotoRow] = []
+        self.text_section_header: Optional[QWidget] = None
+        self.photo_section_header: Optional[QWidget] = None
         self.default_rows_count: int = default_rows
         self.row_widgets: List[RowWidget] = []
         self.exporter_thread: Optional[ExporterThread] = None
@@ -518,8 +574,13 @@ class MainWindow(QMainWindow):
 
     def _update_styles_for_theme(self) -> None:
         """Menyegarkan tampilan widget turunan saat tema aplikasi berganti."""
+        palette = ThemeManager.instance().get_palette()
         if hasattr(self, "empty_state"):
             self.empty_state.update_theme()
+        if getattr(self, "text_section_header", None):
+            self.text_section_header.apply_theme(palette)
+        if getattr(self, "photo_section_header", None):
+            self.photo_section_header.apply_theme(palette)
         if hasattr(self, "_update_filter_button_styles"):
             self._update_filter_button_styles()
         for r in self.dynamic_rows:
@@ -577,11 +638,13 @@ class MainWindow(QMainWindow):
                 """)
 
     def apply_row_filters(self) -> None:
-        """Menyaring baris DynamicPhotoRow berdasarkan kata kunci dan status filter."""
+        """Menyaring baris DynamicPhotoRow dan DynamicTextRow berdasarkan kata kunci dan status filter."""
         search_query = self.input_search.text().strip() if hasattr(self, "input_search") else ""
         status_filter = getattr(self, "active_status_filter", "all")
         visible_count = 0
         total_count = len(self.dynamic_rows)
+        visible_text = 0
+        visible_photo = 0
 
         for row in self.dynamic_rows:
             if hasattr(row, "matches_filter"):
@@ -589,9 +652,22 @@ class MainWindow(QMainWindow):
                 row.setVisible(match)
                 if match:
                     visible_count += 1
+                    if getattr(row, "field_type", "photo") == "text":
+                        visible_text += 1
+                    else:
+                        visible_photo += 1
             else:
                 row.setVisible(True)
                 visible_count += 1
+                if getattr(row, "field_type", "photo") == "text":
+                    visible_text += 1
+                else:
+                    visible_photo += 1
+
+        if getattr(self, "text_section_header", None):
+            self.text_section_header.setVisible(visible_text > 0)
+        if getattr(self, "photo_section_header", None):
+            self.photo_section_header.setVisible(visible_photo > 0)
 
         if hasattr(self, "lbl_filter_stats"):
             if total_count > 0 and (search_query or status_filter != "all"):
@@ -845,13 +921,28 @@ class MainWindow(QMainWindow):
     ) -> None:
         """
         Me-render daftar DynamicPhotoRow dan DynamicTextRow pada ScrollArea sesuai daftar field template.
+        Memisahkan field teks di bagian atas dan field foto di bagian bawah.
         """
         self.scroll_content.setUpdatesEnabled(False)
         self.clear_all_rows()
 
-        for idx, fld in enumerate(template.fields, start=1):
-            fld_type = getattr(fld, "field_type", "photo")
-            if fld_type == "text":
+        text_fields = [f for f in template.fields if getattr(f, "field_type", "photo") == "text"]
+        photo_fields = [f for f in template.fields if getattr(f, "field_type", "photo") != "text"]
+
+        show_headers = bool(text_fields and photo_fields)
+
+        # 1. Render Field Teks (Bagian Atas)
+        if text_fields:
+            if show_headers:
+                self.text_section_header = WorkspaceSectionHeader(
+                    "Informasi & Keterangan Teks",
+                    f"({len(text_fields)} field)",
+                    "file_text",
+                    self.scroll_content,
+                )
+                self.rows_layout.addWidget(self.text_section_header)
+
+            for idx, fld in enumerate(text_fields, start=1):
                 row = DynamicTextRow(
                     field_config=fld,
                     row_index=idx,
@@ -864,7 +955,22 @@ class MainWindow(QMainWindow):
 
                 row.text_changed.connect(self._on_dynamic_text_changed)
                 row.data_changed.connect(self.update_summary_stats)
-            else:
+                self.dynamic_rows.append(row)
+                self.rows_layout.addWidget(row)
+
+        # 2. Render Field Foto (Bagian Bawah)
+        if photo_fields:
+            if show_headers:
+                self.photo_section_header = WorkspaceSectionHeader(
+                    "Dokumentasi Foto",
+                    f"({len(photo_fields)} field)",
+                    "camera",
+                    self.scroll_content,
+                )
+                self.rows_layout.addWidget(self.photo_section_header)
+
+            start_photo_idx = len(text_fields) + 1
+            for idx, fld in enumerate(photo_fields, start=start_photo_idx):
                 row = DynamicPhotoRow(
                     field_config=fld,
                     row_index=idx,
@@ -878,9 +984,8 @@ class MainWindow(QMainWindow):
 
                 row.photo_changed.connect(self._on_dynamic_photo_changed)
                 row.data_changed.connect(self.update_summary_stats)
-
-            self.dynamic_rows.append(row)
-            self.rows_layout.addWidget(row)
+                self.dynamic_rows.append(row)
+                self.rows_layout.addWidget(row)
 
         self.rows_layout.addStretch()
         self.scroll_content.setUpdatesEnabled(True)
@@ -963,6 +1068,9 @@ class MainWindow(QMainWindow):
 
     def clear_all_rows(self) -> None:
         """Membersihkan seluruh widget baris yang ada di layout tanpa menghapus empty state."""
+        self.text_section_header = None
+        self.photo_section_header = None
+
         for row in list(self.row_widgets):
             self.rows_layout.removeWidget(row)
             row.setParent(None)
