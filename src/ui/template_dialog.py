@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
     QFrame,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -518,31 +519,32 @@ class TemplateEditorDialog(QDialog):
     def _init_ui(self) -> None:
         title = "Edit Template Laporan" if self.template else "Buat Template Laporan Baru"
         self.setWindowTitle(title)
-        self.resize(960, 680)
-        self.setMinimumSize(820, 560)
+        self.resize(1020, 750)
+        self.setMinimumSize(860, 580)
         self.setModal(True)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMaximizeButtonHint)
 
         if APP_ICON_PNG.is_file():
             self.setWindowIcon(QIcon(str(APP_ICON_PNG)))
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(18, 12, 18, 12)
+        layout.setSpacing(10)
 
-        # 1. Header
-        header_layout = QVBoxLayout()
-        header_layout.setSpacing(2)
+        # 1. Header Ringkas: Judul & Subtitle Sejajar
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(10)
 
         lbl_title = QLabel(title, self)
         lbl_title.setStyleSheet(f"""
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 700;
             color: {ThemeColors.TEXT};
         """)
         header_layout.addWidget(lbl_title)
 
         lbl_subtitle = QLabel(
-            "Konfigurasikan template Excel induk, penamaan file hasil, dan daftar field foto/teks",
+            "• Konfigurasi template Excel induk, penamaan file hasil, dan daftar field foto/teks",
             self,
         )
         lbl_subtitle.setStyleSheet(f"""
@@ -550,95 +552,153 @@ class TemplateEditorDialog(QDialog):
             color: {ThemeColors.TEXT_MUTED};
         """)
         header_layout.addWidget(lbl_subtitle)
+        header_layout.addStretch(1)
         layout.addLayout(header_layout)
 
-        # 2. Template Metadata Card
-        meta_card = QFrame(self)
-        meta_card.setStyleSheet(f"""
-            QFrame {{
+        # 2. Template Metadata Card (Kompak & Collapsible untuk Memaksimalkan Ruang Tabel)
+        self.meta_card = QFrame(self)
+        self.meta_card.setStyleSheet(f"""
+            QFrame#MetaCard {{
                 background-color: {ThemeColors.SURFACE};
                 border: 1px solid {ThemeColors.BORDER};
                 border-radius: 8px;
-                padding: 10px;
             }}
         """)
-        meta_layout = QVBoxLayout(meta_card)
-        meta_layout.setSpacing(10)
-        meta_layout.setContentsMargins(10, 10, 10, 10)
+        self.meta_card.setObjectName("MetaCard")
+        meta_card_layout = QVBoxLayout(self.meta_card)
+        meta_card_layout.setContentsMargins(12, 8, 12, 10)
+        meta_card_layout.setSpacing(6)
 
-        # Input Nama Template
-        name_layout = QVBoxLayout()
-        name_layout.setSpacing(4)
-        lbl_name = QLabel("Nama Template:", meta_card)
-        lbl_name.setStyleSheet(f"font-weight: 600; color: {ThemeColors.TEXT}; font-size: 12px;")
-        name_layout.addWidget(lbl_name)
+        # Baris Header Meta Card (Title, Summary saat collapse, & Tombol Toggle)
+        meta_header = QHBoxLayout()
+        meta_header.setSpacing(8)
 
-        self.edit_name = QLineEdit(meta_card)
-        self.edit_name.setFixedHeight(34)
+        lbl_meta_icon = QLabel(self.meta_card)
+        lbl_meta_icon.setPixmap(render_svg_pixmap("sliders", color=ThemeColors.PRIMARY, size=14))
+        meta_header.addWidget(lbl_meta_icon)
+
+        lbl_meta_heading = QLabel("Pengaturan Template & Berkas Excel", self.meta_card)
+        lbl_meta_heading.setStyleSheet(f"font-size: 12px; font-weight: 700; color: {ThemeColors.TEXT};")
+        meta_header.addWidget(lbl_meta_heading)
+
+        self.lbl_meta_summary = QLabel(self.meta_card)
+        self.lbl_meta_summary.setStyleSheet(f"font-size: 11px; color: {ThemeColors.TEXT_MUTED};")
+        self.lbl_meta_summary.setVisible(False)
+        meta_header.addWidget(self.lbl_meta_summary, stretch=1)
+
+        self.btn_toggle_meta = QPushButton("Ringkas ▲", self.meta_card)
+        self.btn_toggle_meta.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_toggle_meta.setFixedHeight(24)
+        self.btn_toggle_meta.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent;
+                border: 1px solid {ThemeColors.BORDER};
+                border-radius: 4px;
+                padding: 2px 8px;
+                font-size: 11px;
+                color: {ThemeColors.TEXT_MUTED};
+            }}
+            QPushButton:hover {{
+                border-color: {ThemeColors.PRIMARY};
+                color: {ThemeColors.PRIMARY};
+                background: #EFF6FF;
+            }}
+        """)
+        self.btn_toggle_meta.clicked.connect(self._on_toggle_meta_clicked)
+        meta_header.addWidget(self.btn_toggle_meta)
+
+        meta_card_layout.addLayout(meta_header)
+
+        # Konten Pengaturan (Grid 2 Kolom Kompak)
+        self.meta_content_widget = QWidget(self.meta_card)
+        grid_layout = QGridLayout(self.meta_content_widget)
+        grid_layout.setContentsMargins(0, 4, 0, 0)
+        grid_layout.setHorizontalSpacing(14)
+        grid_layout.setVerticalSpacing(6)
+
+        # Kolom Kiri: Nama Template
+        name_col = QVBoxLayout()
+        name_col.setSpacing(3)
+        lbl_name = QLabel("Nama Template:", self.meta_content_widget)
+        lbl_name.setStyleSheet(f"font-weight: 600; color: {ThemeColors.TEXT}; font-size: 11px;")
+        name_col.addWidget(lbl_name)
+
+        self.edit_name = QLineEdit(self.meta_content_widget)
+        self.edit_name.setFixedHeight(32)
         self.edit_name.setPlaceholderText("Contoh: Template Telkomsel BTS 4G / 5G")
-        name_layout.addWidget(self.edit_name)
-        meta_layout.addLayout(name_layout)
+        self.edit_name.textChanged.connect(self._update_meta_summary)
+        name_col.addWidget(self.edit_name)
+        grid_layout.addLayout(name_col, 0, 0)
 
-        # Input File Template Excel .xlsx
-        file_layout = QVBoxLayout()
-        file_layout.setSpacing(4)
-        lbl_file = QLabel("File Template Excel (.xlsx):", meta_card)
-        lbl_file.setStyleSheet(f"font-weight: 600; color: {ThemeColors.TEXT}; font-size: 12px;")
-        file_layout.addWidget(lbl_file)
+        # Kolom Kanan: Format Nama File Output (Opsional)
+        pattern_col = QVBoxLayout()
+        pattern_col.setSpacing(3)
+        lbl_pattern = QLabel("Format Pola Nama File Output (Opsional):", self.meta_content_widget)
+        lbl_pattern.setStyleSheet(f"font-weight: 600; color: {ThemeColors.TEXT}; font-size: 11px;")
+        pattern_col.addWidget(lbl_pattern)
+
+        self.edit_output_filename_pattern = QLineEdit(self.meta_content_widget)
+        self.edit_output_filename_pattern.setFixedHeight(32)
+        self.edit_output_filename_pattern.setPlaceholderText("Contoh: {template_name}_{site_name}_{date}")
+        pattern_col.addWidget(self.edit_output_filename_pattern)
+        grid_layout.addLayout(pattern_col, 0, 1)
+
+        # Baris Bawah: Berkas Excel Template (Bentang 2 Kolom)
+        file_col = QVBoxLayout()
+        file_col.setSpacing(3)
+        lbl_file = QLabel("File Template Excel (.xlsx):", self.meta_content_widget)
+        lbl_file.setStyleSheet(f"font-weight: 600; color: {ThemeColors.TEXT}; font-size: 11px;")
+        file_col.addWidget(lbl_file)
 
         file_browse_layout = QHBoxLayout()
         file_browse_layout.setSpacing(8)
 
-        self.edit_file_path = QLineEdit(meta_card)
-        self.edit_file_path.setFixedHeight(34)
+        self.edit_file_path = QLineEdit(self.meta_content_widget)
+        self.edit_file_path.setFixedHeight(32)
         self.edit_file_path.setPlaceholderText("Pilih atau masukkan path file .xlsx template...")
         self.edit_file_path.textChanged.connect(self._on_file_path_changed)
+        self.edit_file_path.textChanged.connect(self._update_meta_summary)
         file_browse_layout.addWidget(self.edit_file_path, stretch=1)
 
-        self.btn_browse = QPushButton("Pilih File .xlsx", meta_card)
+        self.btn_browse = QPushButton("Pilih File .xlsx", self.meta_content_widget)
         self.btn_browse.setIcon(get_icon("folder", size=14))
         self.btn_browse.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_browse.setFixedHeight(34)
+        self.btn_browse.setFixedHeight(32)
         self.btn_browse.clicked.connect(self._on_browse_file_clicked)
         file_browse_layout.addWidget(self.btn_browse)
 
-        file_layout.addLayout(file_browse_layout)
+        file_col.addLayout(file_browse_layout)
+        grid_layout.addLayout(file_col, 1, 0, 1, 2)
 
-        # Status sheet auto-load
-        self.lbl_sheet_status = QLabel("Sheet terdeteksi: (Belum ada file dipilih)", meta_card)
+        # Baris Info / Status (Kiri: Status Sheet, Kanan: Info Variabel Pola)
+        status_info_layout = QHBoxLayout()
+        status_info_layout.setSpacing(10)
+
+        self.lbl_sheet_status = QLabel("Sheet terdeteksi: (Belum ada file dipilih)", self.meta_content_widget)
         self.lbl_sheet_status.setStyleSheet(f"font-size: 11px; color: {ThemeColors.TEXT_MUTED};")
-        self.lbl_sheet_status.setWordWrap(True)
-        file_layout.addWidget(self.lbl_sheet_status)
-        meta_layout.addLayout(file_layout)
-
-        # Input Format Pola Nama File Output (Opsional)
-        pattern_layout = QVBoxLayout()
-        pattern_layout.setSpacing(4)
-        lbl_pattern = QLabel("Format Nama File Output (Opsional):", meta_card)
-        lbl_pattern.setStyleSheet(f"font-weight: 600; color: {ThemeColors.TEXT}; font-size: 12px;")
-        pattern_layout.addWidget(lbl_pattern)
-
-        self.edit_output_filename_pattern = QLineEdit(meta_card)
-        self.edit_output_filename_pattern.setFixedHeight(34)
-        self.edit_output_filename_pattern.setPlaceholderText("Contoh: Laporan_{site_name}_{date} atau {template_name}_{site_name}_{Nama Site}")
-        pattern_layout.addWidget(self.edit_output_filename_pattern)
+        status_info_layout.addWidget(self.lbl_sheet_status, stretch=1)
 
         lbl_pattern_hint = QLabel(
-            "Variabel tersedia: {site_name}, {template_name}, {date}, {datetime}, serta label field teks (contoh: {Nama Site})",
-            meta_card,
+            "Variabel: {site_name}, {template_name}, {date}, {datetime}, serta label field teks",
+            self.meta_content_widget,
         )
-        lbl_pattern_hint.setStyleSheet(f"font-size: 11px; color: {ThemeColors.TEXT_MUTED};")
-        pattern_layout.addWidget(lbl_pattern_hint)
-        meta_layout.addLayout(pattern_layout)
+        lbl_pattern_hint.setStyleSheet(f"font-size: 10.5px; color: {ThemeColors.TEXT_MUTED};")
+        lbl_pattern_hint.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        status_info_layout.addWidget(lbl_pattern_hint)
 
-        layout.addWidget(meta_card)
+        grid_layout.addLayout(status_info_layout, 2, 0, 1, 2)
 
-        # 3. Fields Section
+        meta_card_layout.addWidget(self.meta_content_widget)
+        layout.addWidget(self.meta_card, stretch=0)
+
+        # 3. Fields Section (Bagian Terbesar & Paling Utama)
         fields_section_layout = QVBoxLayout()
-        fields_section_layout.setSpacing(6)
+        fields_section_layout.setSpacing(4)
 
         # Baris Header: Judul, Indikator Jumlah & Aksi JSON
         fields_header_top = QHBoxLayout()
+        fields_header_top.setSpacing(8)
+
         lbl_fields_title = QLabel("Daftar Field", self)
         lbl_fields_title.setStyleSheet(f"""
             font-size: 13px;
@@ -686,14 +746,14 @@ class TemplateEditorDialog(QDialog):
         self.btn_add_field = QPushButton("Tambah Field", self)
         self.btn_add_field.setIcon(get_icon("plus", color="#FFFFFF", size=14))
         self.btn_add_field.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_add_field.setFixedHeight(34)
+        self.btn_add_field.setFixedHeight(32)
         self.btn_add_field.clicked.connect(self._on_add_field_clicked)
         fields_toolbar.addWidget(self.btn_add_field)
 
         self.btn_duplicate_field = QPushButton("Duplikat", self)
         self.btn_duplicate_field.setIcon(get_icon("copy", size=14))
         self.btn_duplicate_field.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_duplicate_field.setFixedHeight(34)
+        self.btn_duplicate_field.setFixedHeight(32)
         self.btn_duplicate_field.setToolTip("Duplikat field yang dipilih")
         self.btn_duplicate_field.setEnabled(False)
         self.btn_duplicate_field.clicked.connect(self._on_duplicate_field_clicked)
@@ -702,7 +762,7 @@ class TemplateEditorDialog(QDialog):
         self.btn_edit_field = QPushButton("Edit Detail", self)
         self.btn_edit_field.setIcon(get_icon("edit", size=14))
         self.btn_edit_field.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_edit_field.setFixedHeight(34)
+        self.btn_edit_field.setFixedHeight(32)
         self.btn_edit_field.setToolTip("Buka dialog untuk mengubah pengaturan ukuran/padding")
         self.btn_edit_field.setEnabled(False)
         self.btn_edit_field.clicked.connect(self._on_edit_field_clicked)
@@ -712,18 +772,21 @@ class TemplateEditorDialog(QDialog):
         self.btn_delete_field.setIcon(get_icon("trash", size=14))
         self.btn_delete_field.setObjectName("DangerButton")
         self.btn_delete_field.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_delete_field.setFixedHeight(34)
+        self.btn_delete_field.setFixedHeight(32)
         self.btn_delete_field.setEnabled(False)
         self.btn_delete_field.clicked.connect(self._on_delete_field_clicked)
         fields_toolbar.addWidget(self.btn_delete_field)
 
-        fields_toolbar.addSpacing(10)
+        sep = QFrame(self)
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setStyleSheet(f"color: {ThemeColors.BORDER}; max-height: 20px;")
+        fields_toolbar.addWidget(sep)
 
         # Navigasi Urutan: Paling Atas, Naik 1 Tingkat, Turun 1 Tingkat, Paling Bawah
         self.btn_move_top = QPushButton("Paling Atas", self)
         self.btn_move_top.setIcon(get_icon("chevrons_up", size=14))
         self.btn_move_top.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_move_top.setFixedHeight(34)
+        self.btn_move_top.setFixedHeight(32)
         self.btn_move_top.setToolTip("Pindahkan field ke baris paling pertama")
         self.btn_move_top.setEnabled(False)
         self.btn_move_top.clicked.connect(self._on_move_top_clicked)
@@ -732,7 +795,7 @@ class TemplateEditorDialog(QDialog):
         self.btn_move_up = QPushButton("Naik", self)
         self.btn_move_up.setIcon(get_icon("arrow_up", size=14))
         self.btn_move_up.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_move_up.setFixedHeight(34)
+        self.btn_move_up.setFixedHeight(32)
         self.btn_move_up.setToolTip("Geser field naik 1 tingkat")
         self.btn_move_up.setEnabled(False)
         self.btn_move_up.clicked.connect(self._on_move_up_clicked)
@@ -741,7 +804,7 @@ class TemplateEditorDialog(QDialog):
         self.btn_move_down = QPushButton("Turun", self)
         self.btn_move_down.setIcon(get_icon("arrow_down", size=14))
         self.btn_move_down.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_move_down.setFixedHeight(34)
+        self.btn_move_down.setFixedHeight(32)
         self.btn_move_down.setToolTip("Geser field turun 1 tingkat")
         self.btn_move_down.setEnabled(False)
         self.btn_move_down.clicked.connect(self._on_move_down_clicked)
@@ -750,7 +813,7 @@ class TemplateEditorDialog(QDialog):
         self.btn_move_bottom = QPushButton("Paling Bawah", self)
         self.btn_move_bottom.setIcon(get_icon("chevrons_down", size=14))
         self.btn_move_bottom.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_move_bottom.setFixedHeight(34)
+        self.btn_move_bottom.setFixedHeight(32)
         self.btn_move_bottom.setToolTip("Pindahkan field ke baris paling terakhir")
         self.btn_move_bottom.setEnabled(False)
         self.btn_move_bottom.clicked.connect(self._on_move_bottom_clicked)
@@ -778,8 +841,8 @@ class TemplateEditorDialog(QDialog):
         self.table_fields.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table_fields.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_fields.verticalHeader().setVisible(False)
-        self.table_fields.verticalHeader().setDefaultSectionSize(44)
-        self.table_fields.verticalHeader().setMinimumSectionSize(40)
+        self.table_fields.verticalHeader().setDefaultSectionSize(40)
+        self.table_fields.verticalHeader().setMinimumSectionSize(36)
         self.table_fields.itemSelectionChanged.connect(self._on_field_selection_changed)
         self.table_fields.itemDoubleClicked.connect(self._on_field_table_double_clicked)
 
@@ -818,6 +881,26 @@ class TemplateEditorDialog(QDialog):
 
         layout.addLayout(footer_layout)
 
+    def _update_meta_summary(self) -> None:
+        if not hasattr(self, "lbl_meta_summary") or not hasattr(self, "edit_name"):
+            return
+        name = self.edit_name.text().strip() or "Tanpa Nama"
+        file_str = self.edit_file_path.text().strip() if hasattr(self, "edit_file_path") else ""
+        file_name = Path(file_str).name if file_str else "Belum ada file"
+        sheets_count = len(getattr(self, "available_sheets", []))
+        self.lbl_meta_summary.setText(f"• {name}  |  {file_name} ({sheets_count} sheet)")
+
+    def _on_toggle_meta_clicked(self) -> None:
+        is_visible = self.meta_content_widget.isVisible()
+        self.meta_content_widget.setVisible(not is_visible)
+        if is_visible:
+            self.btn_toggle_meta.setText("Ubah Pengaturan ▼")
+            self._update_meta_summary()
+            self.lbl_meta_summary.setVisible(True)
+        else:
+            self.btn_toggle_meta.setText("Ringkas ▲")
+            self.lbl_meta_summary.setVisible(False)
+
     def _load_initial_data(self) -> None:
         if self.template:
             self.edit_name.setText(self.template.name)
@@ -830,6 +913,7 @@ class TemplateEditorDialog(QDialog):
             self.load_sheet_names(self.template.template_file_path)
 
         self._refresh_fields_table()
+        self._update_meta_summary()
 
     def set_template_file(self, file_path: str) -> None:
         """Set file path template dan muat daftar sheet."""
@@ -858,13 +942,20 @@ class TemplateEditorDialog(QDialog):
             sheets = get_sheet_names_from_excel(clean_path)
             self.available_sheets = sheets
             sheets_text = ", ".join(sheets)
-            self.lbl_sheet_status.setText(f"Sheet terdeteksi ({len(sheets)}): {sheets_text}")
-            self.lbl_sheet_status.setStyleSheet(f"font-size: 11px; color: {ThemeColors.SUCCESS};")
+            if len(sheets_text) > 55:
+                short_text = sheets_text[:52] + "..."
+            else:
+                short_text = sheets_text
+            self.lbl_sheet_status.setText(f"✓ Sheet terdeteksi ({len(sheets)}): {short_text}")
+            self.lbl_sheet_status.setToolTip(f"Daftar Sheet Lengkap ({len(sheets)}):\n{sheets_text}")
+            self.lbl_sheet_status.setStyleSheet(f"font-size: 11px; color: {ThemeColors.SUCCESS}; font-weight: 500;")
+            self._update_meta_summary()
             return sheets
         except Exception as err:
             self.available_sheets = []
             self.lbl_sheet_status.setText(f"Gagal membaca sheet: {err}")
             self.lbl_sheet_status.setStyleSheet(f"font-size: 11px; color: {ThemeColors.ERROR};")
+            self._update_meta_summary()
             return []
 
     def _on_file_path_changed(self, text: str) -> None:
